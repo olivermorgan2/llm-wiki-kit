@@ -99,6 +99,40 @@ assumptions Oliver can still override (which would revise the affected MVP
 issues, not silently persist). `/prd-to-mvp` was **not** started in this
 session, per scope.
 
+### 2026-06-30 — MVP scoped via `/prd-to-mvp`; working name + Go/YAML assumption-locked
+
+Ran the `prd-to-mvp` skill against `design/prd-normalized.md` **plus** addenda
+001–005, producing [`design/mvp.md`](../design/mvp.md) and
+[`design/build-out-plan.md`](../design/build-out-plan.md) from the kit
+templates. No user elicitation was needed — every blocker was already
+assumption-locked by the addenda; the two remaining items were locked per the
+phase mandate.
+
+- **Granularity:** `standard`; **7 phases** mapping 1:1 to the addendum-004
+  slices (Slice 0→Phase 1 … Slice 6→Phase 7) plus a continuous cross-platform
+  gate. Must-pass spine = Phases 1–4; in-MVP hardening = Phases 5–7.
+- **Acceptance gate:** all 21 addendum-001 criteria mapped to an owning
+  phase/milestone (explicit table in the build-out plan). Only hard
+  quantitative gate = zero out-of-boundary writes.
+- **Assumption lock — working name (QB1/Q1):** `llm-wiki-kit` repo/plugin +
+  `llm-wiki` CLI for MVP; final public name/namespace/license/marketplace
+  stays open and Oliver-overridable before packaging (bounded rename, not a
+  scope change).
+- **Assumption lock — Go/YAML (Q2):** Go 1.24.x (conservative current-stable
+  line) + `github.com/goccy/go-yaml` (node-aware, round-trip-preserving;
+  `yaml.v3` archived). Recorded as the **ADR-001** candidate, not a settled
+  decision — reversible, ratified/revised by the first engine ADR. A YAML
+  round-trip risk was added to [`risks.md`](risks.md).
+- **ADR handoff:** the build-out plan surfaces **ADR-001–012** candidates;
+  ADR-001–005 are Phase-1 prerequisites. Next step is `/adr-writer`.
+
+Q2 marked assumption-locked, QB1 marked working-name-locked in
+[`open-questions.md`](open-questions.md). No addendum or PRD content was
+rewritten; the addenda remain source-of-truth refinements. No product/source
+code was created (out of phase scope). Validation: no leftover template
+placeholders, all 21 criteria present in the map, all relative md links in the
+two new files resolve.
+
 ### 2026-06-30 — Knowledge layer reconciled to canonical file set
 
 Aligned `knowledge/` with the project's explicit layer spec: added

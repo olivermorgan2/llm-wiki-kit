@@ -10,7 +10,7 @@ Owner is **Oliver** unless noted.
 | # | Question | Owner | Status |
 |---|---|---|---|
 | Q1 | Plugin name, command namespace, license, and marketplace location. (Repo/working name is `llm-wiki-kit`; CLI is `llm-wiki`. License chosen for the repo scaffold = MIT; "license" in PRD §19 also covers the distributed *plugin*'s license/marketplace listing — confirm they're the same.) | Oliver | open |
-| Q2 | Exact Go YAML library and supported Go version for development. | Oliver | open |
+| Q2 | Exact Go YAML library and supported Go version for development. | Oliver | open · **assumption-locked for MVP planning** → Go 1.24.x (conservative current-stable line) + `github.com/goccy/go-yaml` (node-aware, round-trip-preserving; `yaml.v3` is archived). Recorded as the ADR-001 candidate in [`design/build-out-plan.md`](../design/build-out-plan.md) "Decisions needing ADRs"; reversible, ratified/revised by the first engine ADR. Does not block scoping. |
 | Q3 | Is GitHub Actions the only MVP CI template, or one of several? | Oliver | open · **assumption-locked for MVP** → GitHub Actions only ([addendum 002 A1](../design/prd-addenda/002-mvp-planning-assumptions.md)). Must resolve or keep the lock before `/prd-to-mvp`. |
 | Q4 | Exact research-profile templates and conditional-section syntax. | Oliver | open · **assumption-locked for MVP** → minimum contract in [addendum 003](../design/prd-addenda/003-academic-research-profile-contract.md). Must resolve or keep the lock before `/prd-to-mvp`. |
 | Q5 | Profile registry and trust model for third-party profiles. | Oliver | open · **scoped to Phase 3** ([addendum 005](../design/prd-addenda/005-custom-profile-boundary.md)); does not block MVP. |
@@ -22,5 +22,5 @@ Owner is **Oliver** unless noted.
 
 | # | Question | Owner | Status |
 |---|---|---|---|
-| QB1 | Final product/plugin name vs working repo name `llm-wiki-kit` — lock before issue/PR phases to avoid a later rename. | Oliver | open |
+| QB1 | Final product/plugin name vs working repo name `llm-wiki-kit` — lock before issue/PR phases to avoid a later rename. | Oliver | open · **working-name locked for MVP** → `llm-wiki-kit` repo/plugin, `llm-wiki` CLI ([`design/mvp.md`](../design/mvp.md) "Product name"). Override allowed before packaging/public release; it is a bounded rename, not a scope change. |
 | QB2 | Codex adversarial PRD review of `design/prd-normalized.md`. | Oliver | **closed** — review ran 2026-06-30, verdict `NEEDS_REVISION` ([archive](reviews/2026-06-30-codex-prd-review.md)). All three blocking findings + non-blocking findings accepted and addressed via [`design/prd-addenda/001`–`005`](../design/prd-addenda/); see [`log.md`](log.md). Q3/Q4/Q6/Q7/Q8 are now assumption-locked (above); Q5 scoped to Phase 3. |

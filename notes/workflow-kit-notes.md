@@ -106,6 +106,39 @@ Observations from running smoke checks against the bootstrapped project
   ambiguity. No kit change implied; flagged so the two `decisions`-named
   files aren't confused.
 
+## 2026-06-30 — Running `/prd-to-mvp`
+
+Observations from producing `design/mvp.md` + `design/build-out-plan.md`.
+
+- **Skill template links don't resolve in an installed project.**
+  `.claude/skills/prd-to-mvp/SKILL.md` references
+  `[templates/mvp-template.md](../../templates/mvp-template.md)` (and the
+  build-out one). From `.claude/skills/prd-to-mvp/`, `../../templates/`
+  resolves to `.claude/templates/`, which the installer does **not** create —
+  the actual templates ship at repo-root `templates/` (`templates/mvp-template.md`,
+  `templates/build-out-plan-template.md`). Following the documented relative
+  link 404s; you have to know the templates live at the repo root. **Upstream
+  fix worth proposing:** point skill template links at the installed location
+  (repo-root `templates/`), or have the installer place a `.claude/templates/`
+  symlink/copy so the in-skill relative paths resolve. Low-severity (templates
+  were easy to find via `find`), but it's a broken in-repo link in a
+  load-bearing skill.
+- **`prd-to-mvp` elicitation step is interactive by design but cleanly
+  skippable.** The skill's scoping protocol batches ≤5 questions to the user.
+  In this supervised run every scope decision was already fixed upstream
+  (addenda 001–005 pinned acceptance criteria, slice order, profile contract,
+  scope boundary; the phase mandate locked the last two items), so no question
+  was a genuine blocker. The skill accommodated this — its self-check is about
+  artifact completeness, not about having asked questions — so a fully
+  pre-decided scoping run produces valid artifacts without elicitation. Good
+  for automated/supervised use; flagged only so the no-questions path is known
+  to be supported.
+- **Slice order → phase mapping was frictionless.** Addendum 004's Slice 0–6
+  structure mapped 1:1 onto the build-out plan's 7 phases within the
+  `standard` band, and the addendum-001 criteria mapped cleanly to phase exit
+  gates. The PRD-review addenda did the load-bearing planning work; the skill
+  was mostly a rendering step over an already-decided scope.
+
 ### Open follow-ups
 
 - Fill `CLAUDE.md` `_TBD_` fields once the Go toolchain/test commands are

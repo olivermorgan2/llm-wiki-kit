@@ -21,6 +21,7 @@ elsewhere in the PRD. Status: `open` (mitigation planned, not yet built),
 | Skills bypass deterministic safety | Route managed mutations through staged engine plans; narrow tool access. | open |
 | Skill adapters duplicate core logic | All policy/mutation in shared engine; test adapters as integrations only. | open |
 | A reviewed diff becomes stale before application | Bind plans to source/target hashes; reject stale plans. | open |
+| YAML round-trip drops unknown fields/comments | Acceptance criterion 6 requires unknown-field preservation; planning assumption locks a node-aware YAML library (`goccy/go-yaml`, ADR-001 candidate) over archived `yaml.v3`; round-trip fixture gates Phase 3. | open |
 
 ## Cross-cutting risks (from elsewhere in the PRD)
 
