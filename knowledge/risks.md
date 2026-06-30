@@ -37,4 +37,18 @@ elsewhere in the PRD. Status: `open` (mitigation planned, not yet built),
 
 | Risk | Mitigation | Status |
 |---|---|---|
-| Normalized PRD drifts from source intent | Adversarial Codex review of `design/prd-normalized.md`; findings captured as `design/prd-addenda/` + decisions log before MVP scoping. | open |
+| Normalized PRD drifts from source intent | Adversarial Codex review of `design/prd-normalized.md`; findings captured as `design/prd-addenda/` + decisions log before MVP scoping. | mitigated — review ran 2026-06-30 (`NEEDS_REVISION`); findings landed as addenda 001–005. |
+
+## PRD review findings (Codex 2026-06-30)
+
+Risks surfaced by the adversarial review
+([archive](reviews/2026-06-30-codex-prd-review.md)). Each is addressed by a
+PRD addendum but stays `open` because the underlying engineering work is
+not built yet — the addendum bounds the risk, it does not retire it.
+
+| Risk | Mitigation | Status |
+|---|---|---|
+| Canonical normalized PRD omits acceptance criteria | `prd-normalizer`'s 11-field form dropped `design/prd.md` §17; `/prd-to-mvp` reading only the normalized file would miss/dilute the ship gate. Carried §17 forward into the canonical input via [addendum 001](../design/prd-addenda/001-mvp-acceptance-criteria.md); dogfood note filed for upstream. | open |
+| Academic-research profile underspecified | Initial domain value proposition had prose only and open templates (Q4); unplannable/untestable. Minimum MVP contract (page types, fields, sections, per-type valid/invalid fixtures) fixed in [addendum 003](../design/prd-addenda/003-academic-research-profile-contract.md). | open |
+| MVP surface too wide for first release | Wide MVP (packaging, 5 binaries, install/upgrade/uninstall, custom profiles, hooks, CI, authoring, enrichment, staged mutation, indexes) risks an unshippable flat backlog. Slice order separates the must-pass spine (Slices 0–3) from in-MVP hardening (4–6) in [addendum 004](../design/prd-addenda/004-mvp-slice-order-and-fixture-plan.md). | open |
+| Planning assumptions silently treated as final decisions | Q3/Q6/Q7/Q8 assumption-locked, not decided. Each MVP issue built on an assumption must name it ([addendum 002](../design/prd-addenda/002-mvp-planning-assumptions.md)) so an override is traceable to the issues it touches. | open |

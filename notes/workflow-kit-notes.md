@@ -58,12 +58,29 @@ placeholders.
   desired.
 - **Initial commit message is generic.** `chore: install workflow kit
   (project-local)` — fine, but doesn't reference the project. Minor.
+- **`prd-normalizer`'s 11-field form silently drops MVP acceptance
+  criteria.** The canonical normalized shape has fields for goal, core
+  capabilities, non-goals, constraints, and success signals — but **no
+  field for acceptance criteria / definition-of-done**. The source PRD's
+  §17 "MVP acceptance criteria" (21 concrete, testable conditions) had
+  nowhere to land, so they vanished from `design/prd-normalized.md` even
+  though that file declares itself the *only* input downstream skills
+  (`prd-to-mvp`, `adr-writer`) read. The adversarial Codex review caught
+  this as its top High finding: MVP planning that reads only the normalized
+  file would miss or dilute the ship gate. We worked around it with
+  `design/prd-addenda/001-mvp-acceptance-criteria.md` (carries §17 forward
+  as a 12th field). **Upstream fix worth proposing:** add an "acceptance
+  criteria / definition of done" field to the normalizer's canonical form,
+  or have the normalizer explicitly flag when the source PRD has acceptance
+  criteria it can't represent, instead of dropping them silently.
 
 ### Open follow-ups
 
 - Fill `CLAUDE.md` `_TBD_` fields once the Go toolchain/test commands are
   decided (ties to open questions Q2/Q3).
-- Run the Codex adversarial review of `design/prd-normalized.md` (separate
-  session) and capture findings under `design/prd-addenda/`.
+- ~~Run the Codex adversarial review of `design/prd-normalized.md` and
+  capture findings under `design/prd-addenda/`.~~ **Done 2026-06-30** —
+  verdict `NEEDS_REVISION`; addenda 001–005 created; knowledge layer
+  updated. See `knowledge/decisions.md`.
 - Confirm `/prd-normalizer` (interactive) produces output consistent with
   the hand-run normalization, then proceed to `/prd-to-mvp`.

@@ -11,16 +11,16 @@ Owner is **Oliver** unless noted.
 |---|---|---|---|
 | Q1 | Plugin name, command namespace, license, and marketplace location. (Repo/working name is `llm-wiki-kit`; CLI is `llm-wiki`. License chosen for the repo scaffold = MIT; "license" in PRD §19 also covers the distributed *plugin*'s license/marketplace listing — confirm they're the same.) | Oliver | open |
 | Q2 | Exact Go YAML library and supported Go version for development. | Oliver | open |
-| Q3 | Is GitHub Actions the only MVP CI template, or one of several? | Oliver | open |
-| Q4 | Exact research-profile templates and conditional-section syntax. | Oliver | open |
-| Q5 | Profile registry and trust model for third-party profiles. | Oliver | open |
-| Q6 | Minimum supported Claude Code version. | Oliver | open |
-| Q7 | Exact packaging mechanism for selecting the correct platform binary inside the plugin. | Oliver | open |
-| Q8 | JSON contract versioning and compatibility policy. | Oliver | open |
+| Q3 | Is GitHub Actions the only MVP CI template, or one of several? | Oliver | open · **assumption-locked for MVP** → GitHub Actions only ([addendum 002 A1](../design/prd-addenda/002-mvp-planning-assumptions.md)). Must resolve or keep the lock before `/prd-to-mvp`. |
+| Q4 | Exact research-profile templates and conditional-section syntax. | Oliver | open · **assumption-locked for MVP** → minimum contract in [addendum 003](../design/prd-addenda/003-academic-research-profile-contract.md). Must resolve or keep the lock before `/prd-to-mvp`. |
+| Q5 | Profile registry and trust model for third-party profiles. | Oliver | open · **scoped to Phase 3** ([addendum 005](../design/prd-addenda/005-custom-profile-boundary.md)); does not block MVP. |
+| Q6 | Minimum supported Claude Code version. | Oliver | open · **assumption-locked for MVP** → single version floor, no compat shim ([addendum 002 A2](../design/prd-addenda/002-mvp-planning-assumptions.md)). Must resolve or keep the lock before `/prd-to-mvp`. |
+| Q7 | Exact packaging mechanism for selecting the correct platform binary inside the plugin. | Oliver | open · **assumption-locked for MVP** → one selection mechanism ([addendum 002 A3](../design/prd-addenda/002-mvp-planning-assumptions.md)). Must resolve or keep the lock before `/prd-to-mvp`. |
+| Q8 | JSON contract versioning and compatibility policy. | Oliver | open · **assumption-locked for MVP** → starts at v1, no backward compat until first release ([addendum 002 A4](../design/prd-addenda/002-mvp-planning-assumptions.md)). Must resolve or keep the lock before `/prd-to-mvp`. |
 
 ## Questions raised during bootstrap
 
 | # | Question | Owner | Status |
 |---|---|---|---|
 | QB1 | Final product/plugin name vs working repo name `llm-wiki-kit` — lock before issue/PR phases to avoid a later rename. | Oliver | open |
-| QB2 | Codex adversarial PRD review findings (to be appended once review runs). | Oliver | open |
+| QB2 | Codex adversarial PRD review of `design/prd-normalized.md`. | Oliver | **closed** — review ran 2026-06-30, verdict `NEEDS_REVISION` ([archive](reviews/2026-06-30-codex-prd-review.md)). All three blocking findings + non-blocking findings accepted and addressed via [`design/prd-addenda/001`–`005`](../design/prd-addenda/); see [`decisions.md`](decisions.md). Q3/Q4/Q6/Q7/Q8 are now assumption-locked (above); Q5 scoped to Phase 3. |

@@ -28,4 +28,23 @@ the tool's documented output, not a manual in-place edit.
   [`../../knowledge/open-questions.md`](../../knowledge/open-questions.md)
   and risks to [`../../knowledge/risks.md`](../../knowledge/risks.md).
 
-No addenda exist yet — the Codex review has not been run.
+## Index
+
+The Codex adversarial PRD review (2026-06-30, verdict `NEEDS_REVISION`,
+archived at [`../../knowledge/reviews/2026-06-30-codex-prd-review.md`](../../knowledge/reviews/2026-06-30-codex-prd-review.md))
+produced these accepted addenda:
+
+- [`001-mvp-acceptance-criteria.md`](001-mvp-acceptance-criteria.md) —
+  carry §17 acceptance criteria into the canonical planning input; label
+  success signals as release-gate vs measurement-only.
+- [`002-mvp-planning-assumptions.md`](002-mvp-planning-assumptions.md) —
+  assumption-lock CI scope, Claude Code version floor, binary selection,
+  and JSON-contract compatibility (Q3/Q6/Q7/Q8).
+- [`003-academic-research-profile-contract.md`](003-academic-research-profile-contract.md) —
+  minimum MVP research-profile contract: page types, fields, sections,
+  per-type fixtures (Q4).
+- [`004-mvp-slice-order-and-fixture-plan.md`](004-mvp-slice-order-and-fixture-plan.md) —
+  slice order separating the must-pass first-release spine from follow-on
+  hardening inside MVP, plus the fixture plan.
+- [`005-custom-profile-boundary.md`](005-custom-profile-boundary.md) —
+  MVP custom profiles are local-file only; registry/trust is Phase 3 (Q5).
