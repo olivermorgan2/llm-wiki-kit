@@ -9,30 +9,30 @@ elsewhere in the PRD. Status: `open` (mitigation planned, not yet built),
 
 | Risk | Mitigation | Status |
 |---|---|---|
-| Profile rules mistaken for OKF rules | Report OKF and profile conformance separately; never present a profile rule as universal OKF. | open |
+| Profile rules mistaken for OKF rules | Report OKF and profile conformance separately; never present a profile rule as universal OKF. Bounded by [ADR-004](../design/adr/adr-004-validation-and-severity-model.md) (proposed). | open |
 | Schema becomes rigid too early | Keep `core` conservative; prefer recommendations before requirements. | open |
 | Hooks treated as a security boundary | Position CI as authoritative; document hook limitations; post-write hooks are feedback, not prevention. | open |
-| Model overwrites human work | Preview existing-page changes; preserve unknown/unrelated content. | open |
+| Model overwrites human work | Preview existing-page changes; preserve unknown/unrelated content. Validation applies to human edits too — bounded by [ADR-004](../design/adr/adr-004-validation-and-severity-model.md) (proposed); safe-write gate [ADR-005](../design/adr/adr-005-safe-filesystem-layer.md) (proposed). | open |
 | Sourced claims lose provenance | Require resolvable citations; preserve existing citations. | open |
 | Custom-profile complexity becomes a programming language | Declarative data only; one inheritance level; explicit validation. | open |
-| Cross-platform binaries drift | Automate release builds, checksums, and platform integration tests. | open |
+| Cross-platform binaries drift | Automate release builds, checksums, and platform integration tests. Bounded by [ADR-002](../design/adr/adr-002-platform-binary-selection.md) (proposed). | open |
 | Compilation drops important research facts | Track evidence gaps; keep sources addressable; deeper evaluation later. | open |
 | Upgrades overwrite customization | Track ownership; preview repository changes; preserve local profile extensions. | open |
-| Skills bypass deterministic safety | Route managed mutations through staged engine plans; narrow tool access. | open |
+| Skills bypass deterministic safety | Route managed mutations through staged engine plans; narrow tool access. Mandatory engine write-gate in [ADR-005](../design/adr/adr-005-safe-filesystem-layer.md) (proposed); staged inspect/plan/apply deferred to ADR-006. | open |
 | Skill adapters duplicate core logic | All policy/mutation in shared engine; test adapters as integrations only. | open |
-| A reviewed diff becomes stale before application | Bind plans to source/target hashes; reject stale plans. | open |
-| YAML round-trip drops unknown fields/comments | Acceptance criterion 6 requires unknown-field preservation; planning assumption locks a node-aware YAML library (`goccy/go-yaml`, ADR-001 candidate) over archived `yaml.v3`; round-trip fixture gates Phase 3. | open |
+| A reviewed diff becomes stale before application | Bind plans to source/target hashes; reject stale plans. Referenced by [ADR-003](../design/adr/adr-003-json-contract-and-exit-codes.md) (proposed); hash-binding mechanism owned by ADR-006. | open |
+| YAML round-trip drops unknown fields/comments | Acceptance criterion 6 requires unknown-field preservation; [ADR-001](../design/adr/adr-001-go-toolchain-and-yaml.md) (proposed) adopts a node-aware YAML library (`goccy/go-yaml`) over archived `yaml.v3`; round-trip fixture gates Phase 3. | open |
 
 ## Cross-cutting risks (from elsewhere in the PRD)
 
 | Risk | Mitigation | Status |
 |---|---|---|
-| Supply chain / tampered binary | Versioned, checksum-verified release artifacts; verify checksums before executing bundled CLI (PRD §9, §14 Security). | open |
-| Path traversal / symlink escape | Engine canonicalizes & validates paths; resolves symlinks; rejects escapes; bounded write scope (FR10, §14). | open |
-| Untrusted source material as instructions | Treat imported content as data, never as agent instructions; repo content cannot override plugin/user instructions (FR10, §14 Security). | open |
-| Stale mutation plan applied after target changed | `apply` rechecks hashes and refuses stale/modified plans without mutating (FR7, FR11). | open |
-| Partial multi-file writes on interruption | Atomic writes; no partial updates across multi-file ops; safe recovery from interruption (FR1, FR10, §14 Reliability). | open |
-| Divergent findings across skills/hooks/CI/CLI | One deterministic implementation shared by all four; acceptance criterion requires identical findings for identical state (§17). | open |
+| Supply chain / tampered binary | Versioned, checksum-verified release artifacts; verify checksums before executing bundled CLI (PRD §9, §14 Security). Checksum-verify-before-exec is a decided chokepoint in [ADR-002](../design/adr/adr-002-platform-binary-selection.md) (proposed). | open |
+| Path traversal / symlink escape | Engine canonicalizes & validates paths; resolves symlinks; rejects escapes; bounded write scope (FR10, §14). Single mandatory write-gate in [ADR-005](../design/adr/adr-005-safe-filesystem-layer.md) (proposed) — criterion 17 hard gate. | open |
+| Untrusted source material as instructions | Treat imported content as data, never as agent instructions; repo content cannot override plugin/user instructions (FR10, §14 Security). Inputs-as-data structurally closed by the write-gate in [ADR-005](../design/adr/adr-005-safe-filesystem-layer.md) (proposed). | open |
+| Stale mutation plan applied after target changed | `apply` rechecks hashes and refuses stale/modified plans without mutating (FR7, FR11). Referenced by [ADR-003](../design/adr/adr-003-json-contract-and-exit-codes.md) (proposed); mechanism owned by ADR-006. | open |
+| Partial multi-file writes on interruption | Atomic writes; no partial updates across multi-file ops; safe recovery from interruption (FR1, FR10, §14 Reliability). Atomic write+rename and all-or-nothing staging in [ADR-005](../design/adr/adr-005-safe-filesystem-layer.md) (proposed). | open |
+| Divergent findings across skills/hooks/CI/CLI | One deterministic implementation shared by all four; acceptance criterion requires identical findings for identical state (§17). Shared JSON envelope [ADR-003](../design/adr/adr-003-json-contract-and-exit-codes.md) + single validation engine [ADR-004](../design/adr/adr-004-validation-and-severity-model.md) (both proposed) — criterion 15. | open |
 
 ## Process risk (this collaboration)
 

@@ -5,14 +5,17 @@ Front door to the `llm-wiki-kit` knowledge layer. Conventions live in
 
 ## Current phase
 
-**MVP scoped — READY for `/adr-writer`.** Bootstrapped 2026-06-30 from
-`claude-workflow-kit` v5.0.1. Source PRD normalized; adversarial Codex review
-(`NEEDS_REVISION`) landed as PRD addenda 001–005; `/prd-to-mvp` then produced
-[`design/mvp.md`](../design/mvp.md) and
+**ADR-001–005 drafted (`proposed`) — pending Codex ADR review + human
+acceptance.** Bootstrapped 2026-06-30 from `claude-workflow-kit` v5.0.1. Source
+PRD normalized; adversarial Codex review (`NEEDS_REVISION`) landed as PRD addenda
+001–005; `/prd-to-mvp` produced [`design/mvp.md`](../design/mvp.md) and
 [`design/build-out-plan.md`](../design/build-out-plan.md) (7 phases / Slices
-0–6 + cross-platform gate, all 21 acceptance criteria mapped). Working name
-and Go/YAML toolchain assumption-locked for MVP. See [`log.md`](log.md) for
-the full chain.
+0–6 + cross-platform gate, all 21 acceptance criteria mapped). The five Phase-1
+prerequisite ADRs ([`design/adr/`](../design/adr/) 001–005: toolchain, binary
+selection, JSON contract, validation model, safe-FS gate) are now drafted as
+`proposed` and self-validated (`check-plan` deterministic gate passes; index
+synced). Acceptance remains a human act. See [`log.md`](log.md) for the full
+chain.
 
 ## Knowledge layer
 
@@ -35,13 +38,16 @@ the full chain.
 | [`design/prd-addenda/`](../design/prd-addenda/) | Additive review fixes 001–005 carried into the PRD gate. |
 | [`design/mvp.md`](../design/mvp.md) | MVP statement — scope, principles, success criteria, binding ship gate. |
 | [`design/build-out-plan.md`](../design/build-out-plan.md) | 7-phase plan, criteria→phase map, milestones, issue backlog, ADR-001–012 candidates. |
-| [`design/adr/`](../design/adr/) | ADR index — no project ADRs yet; ADR-001–012 candidates surfaced by the build-out plan, drafted next by `/adr-writer`. |
+| [`design/adr/`](../design/adr/) | ADR index — ADR-001–005 drafted (`proposed`); ADR-006–012 candidates still surfaced by the build-out plan. |
 
 ## Next action
 
-Run `/adr-writer` against the "Decisions needing ADRs" list at the end of
-[`design/build-out-plan.md`](../design/build-out-plan.md) (ADR-001–012
-candidates; ADR-001–005 are Phase-1 prerequisites and should be drafted
-first). Owner decisions that could revise MVP scope remain tracked as
-assumption-locked items in [`open-questions.md`](open-questions.md) — notably
-the working-name lock (QB1) and the Go/YAML toolchain lock (Q2, = ADR-001).
+**Codex ADR/milestone review gate** over the five `proposed` ADRs
+([`design/adr/`](../design/adr/) 001–005) before human acceptance. On
+acceptance: flip each ADR to `accepted`, then flip Q2/Q7/Q8 to `closed` in
+[`open-questions.md`](open-questions.md) with a [`log.md`](log.md)
+back-reference; accepted ADRs then feed `/prepare-issue` for Phase 1. ADR-006–012
+remain to be drafted from the "Decisions needing ADRs" list at the end of
+[`design/build-out-plan.md`](../design/build-out-plan.md). Owner decisions that
+could revise MVP scope remain tracked as assumption-locked items in
+[`open-questions.md`](open-questions.md) — notably the working-name lock (QB1).

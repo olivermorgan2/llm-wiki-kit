@@ -133,6 +133,56 @@ code was created (out of phase scope). Validation: no leftover template
 placeholders, all 21 criteria present in the map, all relative md links in the
 two new files resolve.
 
+### 2026-07-01 — ADR-001–005 drafted (`proposed`) — Phase-1 engine-foundation gate
+
+Drafted the five Phase-1-prerequisite ADRs from the build-out plan's "Decisions
+needing ADRs" list (topics 1–5), in one batch so `adr-alloc` numbered them
+001–005. ADR bodies carry **`Date: 2026-06-30`** (inherited from the plan-mode
+drafts, consistent with the surrounding MVP/PRD design batch); the drafting and
+gate ran 2026-07-01. All five ship as **`proposed`** — acceptance is a human act
+(see [`SCHEMA.md`](SCHEMA.md); no open question flipped to `closed` here).
+
+Topic → ADR map (and the question/criteria each advances):
+
+- [ADR-001](../design/adr/adr-001-go-toolchain-and-yaml.md) — Go 1.24.x +
+  `goccy/go-yaml`. **Ratifies the Q2 assumption-lock** (round-trip criterion 6
+  needs a node-aware library; `yaml.v3` archived).
+- [ADR-002](../design/adr/adr-002-platform-binary-selection.md) — ship + select
+  + checksum-verify one per-platform binary (criteria 2, 21). **Advances Q7.**
+  Scope: ship/select/verify only; install/upgrade/uninstall **asset ownership**
+  (criteria 1, 3, 20) stays **deferred to ADR-009**.
+- [ADR-003](../design/adr/adr-003-json-contract-and-exit-codes.md) — one
+  versioned JSON envelope + fixed six-value exit-code set (criteria 14, 15).
+  **Advances Q8.** Hash-bound stale-plan rejection (criterion 13) referenced but
+  owned by ADR-006.
+- [ADR-004](../design/adr/adr-004-validation-and-severity-model.md) — single
+  validation engine, ruleset-tagged (OKF vs profile) three-severity findings
+  (criteria 5, 7, 8). Provenance (9) → ADR-008; index consistency → ADR-010.
+- [ADR-005](../design/adr/adr-005-safe-filesystem-layer.md) — one mandatory
+  filesystem-safety gate (criterion 17, the only hard quantitative release
+  gate). inspect/plan/apply mechanics → ADR-006.
+
+**Conventions/validation:** files match `templates/adr-template.md`; `**Phase:**`
+line omitted on all five (cross-cutting engine foundations, not single-phase) so
+`sync-adr-index` renders no Phase column. `check-plan --criteria-set adr` passes
+deterministic ADR-C1–C4 on all five (exit 0); ADR-C5 emits expected forward-ref
+warnings (ADR-006/008/009/010 not yet drafted); ADR-C6 is deferred in the tool.
+`sync-adr-index` populated the 5-row table in `design/adr/README.md`. No
+template placeholders remain.
+
+**Knowledge-layer updates (curate, don't accrete):** Q2/Q7/Q8 annotated
+`assumption-locked → ADR-00N proposed` (still **not** `closed`) in
+[`open-questions.md`](open-questions.md); ADR back-references added to the
+relevant rows in [`risks.md`](risks.md) (statuses left `open` — the ADR bounds
+the risk, it does not retire it before the engineering exists);
+[`index.md`](index.md) phase/next-action advanced to the Codex ADR review gate.
+
+**Gate status:** ADR-001–005 are drafted and self-validated but **`proposed`**.
+Next step is the Codex ADR/milestone review gate before any human acceptance;
+only on acceptance do Q2/Q7/Q8 flip to `closed` (with a back-reference here) and
+do accepted ADRs become inputs to `/prepare-issue` for Phase 1. No product/source
+code was created; no remote side effects.
+
 ### 2026-06-30 — Knowledge layer reconciled to canonical file set
 
 Aligned `knowledge/` with the project's explicit layer spec: added
