@@ -74,6 +74,38 @@ placeholders.
   or have the normalizer explicitly flag when the source PRD has acceptance
   criteria it can't represent, instead of dropping them silently.
 
+## 2026-06-30 — Validation surface in an *installed* project
+
+Observations from running smoke checks against the bootstrapped project
+(not the kit source repo).
+
+- **`bin/self-test` is not installed into consumer projects.** With
+  `--with-docs`, `docs/workflow-kit/self-test.md` ships and documents
+  `bin/self-test`, `bin/self-test --format json`, and
+  `notes/self-test-log.md` — but the installer copies only `.claude/bin/`
+  helpers (`adr-alloc`, `changelog-collect`, `check-plan`, `docs-render`,
+  `fence`, `pr-context`, `release-suggest`, `sync-adr-index`, plus
+  `lib/`). There is no top-level `bin/` and no `self-test` in an installed
+  project, so the kit's headline "automated, non-mutating self-test" is
+  **not runnable from a consumer repo** — the doc describes a kit-dev-only
+  tool. **Upstream fix worth proposing:** either ship a consumer-scoped
+  self-test (wrapping the read-only `.claude/bin` validators) or gate the
+  self-test doc out of `--with-docs` so installed projects don't carry a
+  doc for a tool they don't have.
+- **What *is* runnable as a smoke check** (all green here): `bash -n`
+  across every `.claude/bin/*` and `.claude/bin/lib/*.sh` (10 scripts),
+  `python3 -m py_compile` on the two `lib/*.py` helpers, and
+  usage/`--help` invocations of `check-plan` and `sync-adr-index`
+  (both exit 0). Required tools present: `bash`, `jq`, `python3`, `gh`.
+- **Knowledge-layer file naming is a local convention, not the kit's.**
+  This session reconciled the layer to an explicit spec
+  (`SCHEMA.md` + `index.md` + `log.md` alongside `project-brief.md`,
+  `risks.md`, `open-questions.md`, `reviews/`); `decisions.md` was renamed
+  to `log.md`. Worth noting only because the kit's own `design/decisions.md`
+  shares the old name — keeping the knowledge log as `log.md` removes that
+  ambiguity. No kit change implied; flagged so the two `decisions`-named
+  files aren't confused.
+
 ### Open follow-ups
 
 - Fill `CLAUDE.md` `_TBD_` fields once the Go toolchain/test commands are

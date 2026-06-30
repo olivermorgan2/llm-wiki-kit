@@ -9,7 +9,7 @@
   profiles are **local-file only**. Registry distribution and third-party
   trust are **Phase 3 (Ecosystem)** unless Oliver decides otherwise.
 - **Knowledge links:** `knowledge/open-questions.md` Q5 (scoped to Phase 3,
-  stays open); `knowledge/decisions.md` (verdict entry).
+  stays open); `knowledge/log.md` (verdict entry).
 
 ## In MVP scope (custom profiles)
 

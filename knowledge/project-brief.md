@@ -78,5 +78,7 @@ the source of truth.
 ## Status
 
 Bootstrapped 2026-06-30 from `claude-workflow-kit` v5.0.1. Phase: PRD
-normalization complete; next gate is adversarial Codex review of
-`design/prd-normalized.md` (see [`decisions.md`](decisions.md)).
+normalization complete; adversarial Codex review ran (`NEEDS_REVISION`)
+with findings carried into PRD addenda 001–005. PRD gate is **READY for
+`/prd-to-mvp`**, which has not been started. See [`log.md`](log.md) and
+[`index.md`](index.md).

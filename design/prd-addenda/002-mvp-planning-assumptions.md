@@ -10,7 +10,7 @@
   records explicit *planning assumptions* that `/prd-to-mvp` and
   `/issue-planner` may build on. Each assumption is overridable by Oliver;
   if overridden, the affected MVP issues are revised, not silently kept.
-  None of these is recorded in `knowledge/decisions.md` as a settled
+  None of these is recorded in `knowledge/log.md` as a settled
   product decision — the open questions stay **open** with an
   "assumption-locked" marker.
 - **Knowledge links:** `knowledge/open-questions.md` (Q3/Q4/Q6/Q7/Q8

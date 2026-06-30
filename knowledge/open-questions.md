@@ -2,7 +2,7 @@
 
 Unresolved product/technical decisions. Seeded from PRD §19 "Remaining
 product decisions" ([`design/prd.md`](../design/prd.md)). When one is
-resolved, record the resolution in [`decisions.md`](decisions.md) (and an
+resolved, record the resolution in [`log.md`](log.md) (and an
 ADR in `design/adr/` if architectural), then mark it `closed` here.
 
 Owner is **Oliver** unless noted.
@@ -23,4 +23,4 @@ Owner is **Oliver** unless noted.
 | # | Question | Owner | Status |
 |---|---|---|---|
 | QB1 | Final product/plugin name vs working repo name `llm-wiki-kit` — lock before issue/PR phases to avoid a later rename. | Oliver | open |
-| QB2 | Codex adversarial PRD review of `design/prd-normalized.md`. | Oliver | **closed** — review ran 2026-06-30, verdict `NEEDS_REVISION` ([archive](reviews/2026-06-30-codex-prd-review.md)). All three blocking findings + non-blocking findings accepted and addressed via [`design/prd-addenda/001`–`005`](../design/prd-addenda/); see [`decisions.md`](decisions.md). Q3/Q4/Q6/Q7/Q8 are now assumption-locked (above); Q5 scoped to Phase 3. |
+| QB2 | Codex adversarial PRD review of `design/prd-normalized.md`. | Oliver | **closed** — review ran 2026-06-30, verdict `NEEDS_REVISION` ([archive](reviews/2026-06-30-codex-prd-review.md)). All three blocking findings + non-blocking findings accepted and addressed via [`design/prd-addenda/001`–`005`](../design/prd-addenda/); see [`log.md`](log.md). Q3/Q4/Q6/Q7/Q8 are now assumption-locked (above); Q5 scoped to Phase 3. |

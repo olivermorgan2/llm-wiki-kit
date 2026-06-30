@@ -1,6 +1,7 @@
-# Decision & review log — llm-wiki-kit
+# Log — decisions & review outcomes — llm-wiki-kit
 
-Chronological log of decisions and review outcomes. Lightweight; an item
+Chronological log of decisions and review outcomes (knowledge-layer `log.md`).
+Lightweight; an item
 that is genuinely architectural should be promoted to an ADR in
 `design/adr/` via `/adr-writer`, with a back-reference here.
 
@@ -97,3 +98,17 @@ and scope boundary that the review required. The PRD gate is **READY for
 assumptions Oliver can still override (which would revise the affected MVP
 issues, not silently persist). `/prd-to-mvp` was **not** started in this
 session, per scope.
+
+### 2026-06-30 — Knowledge layer reconciled to canonical file set
+
+Aligned `knowledge/` with the project's explicit layer spec: added
+[`SCHEMA.md`](SCHEMA.md) (canonical conventions) and [`index.md`](index.md)
+(live front door), renamed `decisions.md` → `log.md` (this file), and
+slimmed `README.md` to defer to the two. The layer now provides
+`SCHEMA.md`, `index.md`, `log.md`, `project-brief.md`, `risks.md`,
+`open-questions.md`, and `reviews/`. Intra-layer and addenda links were
+repointed to `log.md`; the verbatim review archive under `reviews/` was
+left unmodified. No `design/` artifact, PRD, or addendum content changed —
+this was a curation/structure pass only. Also verified PRD provenance:
+`design/prd.md`, `knowledge/sources/prd-original.md`, and the supplied
+source share an identical SHA-256.
