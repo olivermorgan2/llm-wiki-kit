@@ -1,0 +1,242 @@
+#!/usr/bin/env bash
+# check-plan — programmatic equivalent of the /check-plan slash-command.
+#
+# Skills with documented chain points (adr-writer, prepare-issue,
+# changelog, milestone-summary, pr-review-packager) invoke this as a
+# subprocess instead of trying to chain to the slash-command, per
+# ADR-043. The slash-command surface (skills/check-plan/SKILL.md) is
+# the operator-interactive entry point; both surfaces share the same
+# eval module under bin/lib/check-plan-eval.sh, so the criteria list
+# in skills/check-plan/criteria.md is the single canonical source.
+#
+# Usage:
+#   bin/check-plan --criteria-set <name> --input <path-or-->
+#                  [--format text|json] [--non-interactive] [-h]
+#
+# Flags:
+#   --criteria-set <name>   adr | prompt
+#                           (changelog, milestone-summary, pr-body are
+#                           reserved for follow-up issues)
+#   --input <path>          artefact path, or - for stdin
+#   --format <text|json>    default text; use json for skill consumption
+#   --non-interactive       implicit when --format=json; fail closed on
+#                           ambiguous input rather than ask the operator
+#   -h, --help              print this header
+#
+# Exit codes:
+#   0  all deterministic criteria pass (warnings allowed)
+#   1  one or more deterministic criteria fail
+#   2  invocation error (bad flags, criteria set unknown, input unreadable)
+#
+# Output (text):
+#   PASS  CRITERION-ID  short description
+#   FAIL  CRITERION-ID  failure reason; remediation
+#   WARN  CRITERION-ID  short description (does not affect exit code)
+#
+# Output (json):
+#   {"criteria-set": "<name>", "result": "pass|fail",
+#    "criteria": [{"id":"...", "severity":"deterministic|warning",
+#                  "status":"pass|fail|warn",
+#                  "message":"...", "remediation":"..."}]}
+#
+# See ADR-043 for the design decision and ADR-034 for the upstream
+# /check-plan skill that this surface mirrors.
+
+set -euo pipefail
+
+# ---- argument parsing ---------------------------------------------------
+
+CRITERIA_SET=""
+INPUT_PATH=""
+FORMAT="text"
+NON_INTERACTIVE=0
+
+usage() {
+  sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --criteria-set)
+      [ $# -ge 2 ] || { printf 'check-plan: --criteria-set needs an argument\n' >&2; exit 2; }
+      CRITERIA_SET="$2"
+      shift 2
+      ;;
+    --input)
+      [ $# -ge 2 ] || { printf 'check-plan: --input needs an argument\n' >&2; exit 2; }
+      INPUT_PATH="$2"
+      shift 2
+      ;;
+    --format)
+      [ $# -ge 2 ] || { printf 'check-plan: --format needs an argument\n' >&2; exit 2; }
+      FORMAT="$2"
+      shift 2
+      ;;
+    --non-interactive)
+      NON_INTERACTIVE=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      printf 'check-plan: unknown argument: %s\n' "$1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [ -z "$CRITERIA_SET" ]; then
+  printf 'check-plan: --criteria-set is required (one of: adr, prompt)\n' >&2
+  exit 2
+fi
+
+if [ -z "$INPUT_PATH" ]; then
+  printf 'check-plan: --input is required (path, or - for stdin)\n' >&2
+  exit 2
+fi
+
+case "$FORMAT" in
+  text|json) ;;
+  *) printf 'check-plan: --format must be text or json (got: %s)\n' "$FORMAT" >&2; exit 2 ;;
+esac
+
+if [ "$FORMAT" = "json" ]; then
+  NON_INTERACTIVE=1
+fi
+
+# ---- resolve input to a real file --------------------------------------
+
+INPUT_FILE=""
+TMP_INPUT=""
+
+cleanup() {
+  if [ -n "$TMP_INPUT" ] && [ -f "$TMP_INPUT" ]; then
+    rm -f "$TMP_INPUT"
+  fi
+  return 0
+}
+trap cleanup EXIT
+
+if [ "$INPUT_PATH" = "-" ]; then
+  TMP_INPUT=$(mktemp 2>/dev/null || mktemp -t check-plan)
+  cat > "$TMP_INPUT"
+  INPUT_FILE="$TMP_INPUT"
+else
+  if [ ! -f "$INPUT_PATH" ]; then
+    printf 'check-plan: input file not found: %s\n' "$INPUT_PATH" >&2
+    exit 2
+  fi
+  if [ ! -r "$INPUT_PATH" ]; then
+    printf 'check-plan: input file not readable: %s\n' "$INPUT_PATH" >&2
+    exit 2
+  fi
+  INPUT_FILE="$INPUT_PATH"
+fi
+
+# ---- source the eval module --------------------------------------------
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+EVAL_LIB="$SCRIPT_DIR/lib/check-plan-eval.sh"
+
+if [ ! -f "$EVAL_LIB" ]; then
+  printf 'check-plan: eval module missing: %s\n' "$EVAL_LIB" >&2
+  exit 2
+fi
+
+# shellcheck source=lib/check-plan-eval.sh
+. "$EVAL_LIB"
+
+# ---- dispatch -----------------------------------------------------------
+
+case "$CRITERIA_SET" in
+  adr)    RECORDS=$(eval_adr_criteria "$INPUT_FILE") ;;
+  prompt) RECORDS=$(eval_prompt_criteria "$INPUT_FILE") ;;
+  changelog|milestone-summary|pr-body)
+    printf 'check-plan: criteria set %q is reserved but not yet implemented.\n' "$CRITERIA_SET" >&2
+    printf '  See the workflow-generator backlog for the follow-up issue that adds it.\n' >&2
+    exit 2
+    ;;
+  *)
+    printf 'check-plan: unknown criteria set: %s\n' "$CRITERIA_SET" >&2
+    printf '  valid sets: adr, prompt\n' >&2
+    exit 2
+    ;;
+esac
+
+# ---- compute exit code -------------------------------------------------
+# RECORDS is one TSV line per criterion: id<TAB>severity<TAB>status<TAB>message<TAB>remediation
+
+EXIT_CODE=0
+while IFS=$'\t' read -r id severity status message remediation; do
+  if [ -z "$id" ]; then
+    continue
+  fi
+  if [ "$status" = "fail" ] && [ "$severity" = "deterministic" ]; then
+    EXIT_CODE=1
+  fi
+done <<<"$RECORDS"
+
+# ---- render output -----------------------------------------------------
+
+# json_escape — safely encode an arbitrary string as a JSON string body.
+# Handles backslash, double-quote, newline, tab, carriage return.
+# Other control characters are passed through; messages in the eval
+# module avoid them by construction.
+json_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"
+  s="${s//$'\r'/\\r}"
+  s="${s//$'\t'/\\t}"
+  printf '%s' "$s"
+}
+
+if [ "$FORMAT" = "text" ]; then
+  while IFS=$'\t' read -r id severity status message remediation; do
+    if [ -z "$id" ]; then
+      continue
+    fi
+    case "$status" in
+      pass) label="PASS" ;;
+      fail) label="FAIL" ;;
+      warn) label="WARN" ;;
+      *)    label="????" ;;
+    esac
+    if [ "$status" = "fail" ]; then
+      printf '%s  %s  %s; %s\n' "$label" "$id" "$message" "$remediation"
+    else
+      printf '%s  %s  %s\n' "$label" "$id" "$message"
+    fi
+  done <<<"$RECORDS"
+else
+  # json
+  if [ "$EXIT_CODE" -eq 0 ]; then
+    overall="pass"
+  else
+    overall="fail"
+  fi
+  printf '{"criteria-set":"%s","result":"%s","criteria":[' "$CRITERIA_SET" "$overall"
+  first=1
+  while IFS=$'\t' read -r id severity status message remediation; do
+    if [ -z "$id" ]; then
+      continue
+    fi
+    if [ "$first" -eq 1 ]; then
+      first=0
+    else
+      printf ','
+    fi
+    printf '{"id":"%s","severity":"%s","status":"%s","message":"%s","remediation":"%s"}' \
+      "$(json_escape "$id")" \
+      "$(json_escape "$severity")" \
+      "$(json_escape "$status")" \
+      "$(json_escape "$message")" \
+      "$(json_escape "$remediation")"
+  done <<<"$RECORDS"
+  printf ']}\n'
+fi
+
+exit "$EXIT_CODE"

@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# fence — read and splice marker-fenced zones deterministically (ADR-054).
+#
+# Skills are markdown and cannot import the shared fence library, so they
+# shell out to this CLI for the mechanics they used to describe inline:
+# reading a zone's body, replacing only the bytes between a zone's markers
+# without clobbering surrounding prose, omitting a whole workflow-docs
+# section, listing zones, and collapsing blank-line runs. The deterministic
+# logic lives in bin/lib/fences.py (also imported directly by docs-render and
+# the fences-eval harness).
+#
+# Usage:
+#   bin/fence read    --file PATH --dialect DIALECT --zone ZONE [--format text|json]
+#   bin/fence replace --file PATH --dialect DIALECT --zone ZONE (--body STR | --body - | --body-file F) [--dry-run] [--format ...]
+#   bin/fence omit    --file PATH --dialect workflow-docs --zone ZONE [--dry-run] [--format ...]
+#   bin/fence list    --file PATH --dialect DIALECT [--format ...]
+#   bin/fence collapse --file PATH [--dry-run] [--format ...]
+#
+# Flags:
+#   --file PATH          target file (required)
+#   --dialect DIALECT    one of: state, summary, workflow-docs, adr-index
+#   --zone ZONE          zone name (e.g. in-flight, overview); required for read/replace/omit
+#   --body STR           new body text for replace; use `--body -` to read body from stdin
+#   --body-file F        read the new body for replace from file F (best for multi-line YAML)
+#   --dry-run            render the result to stdout/outputs without writing the file
+#   --format text|json   default text; json emits the standard envelope
+#   -h, --help           print this header
+#
+# Exit codes (shared convention; see lib/json-envelope.sh):
+#   0  success
+#   1  domain failure (malformed markers / zone not found — "cannot safely update")
+#   2  invocation error (bad flags, missing file, bad dialect)
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=lib/json-envelope.sh
+. "$SCRIPT_DIR/lib/json-envelope.sh"
+
+usage() { sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'; }
+
+FORMAT="text"
+PYARGS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --format)
+      [ $# -ge 2 ] || { printf 'fence: --format needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }
+      FORMAT="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) PYARGS+=("$1"); shift ;;
+  esac
+done
+case "$FORMAT" in
+  text|json) ;;
+  *) printf 'fence: --format must be text or json (got: %s)\n' "$FORMAT" >&2; exit "$ENVELOPE_EXIT_INVOCATION" ;;
+esac
+
+RESULT=$(python3 "$SCRIPT_DIR/lib/fences.py" "${PYARGS[@]}")
+RC=$?
+
+STATUS=$(printf '%s' "$RESULT" | jq -r '.status')
+OUTPUTS=$(printf '%s' "$RESULT" | jq -c '.outputs')
+ERRORS=$(printf '%s' "$RESULT" | jq -c '.errors')
+
+if [ "$FORMAT" = "json" ]; then
+  print_envelope "fence" "$STATUS" "$OUTPUTS" "[]" "$ERRORS"
+else
+  printf '%s\n' "$(printf '%s' "$RESULT" | jq -r '.text')"
+fi
+
+exit "$RC"

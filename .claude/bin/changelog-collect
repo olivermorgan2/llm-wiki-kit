@@ -1,0 +1,391 @@
+#!/usr/bin/env bash
+# changelog-collect — parse git history into grouped, deduped, categorized
+# commit data as JSON for the changelog/release skills (ADR-054).
+#
+# This is the deterministic spine the changelog skill used to run inline in
+# the prompt: git-log delimiter parsing, issue/ADR token extraction,
+# label-primary -> verb-fallback -> other categorization, and dedupe (exact
+# subject / same trailing PR ref / >=75% token-set overlap). It emits
+# structured, render-ready JSON; the skill turns that into markdown prose and
+# decides phrasing and where to publish. The LLM no longer parses git log.
+#
+# Offline harness (for fixtures/tests, mirroring AI-review's --mock):
+#   --git-log-file FILE  read the raw %x1f/%x1e stream instead of running git
+#   --gh-mock DIR        read PR labels from DIR/pr-view-<N>-labels.json
+#                        (or a DIR/pr-view-<N>-labels.absent marker) instead
+#                        of calling gh
+# With both set, the collector is a pure function of its inputs.
+#
+# Usage:
+#   bin/changelog-collect (--from REF --to REF | --since-last-release)
+#       [--include-merges] [--origin URL] [--git-log-file FILE]
+#       [--gh-mock DIR] [--format text|json] [-h]
+#
+# Exit codes (shared convention; see lib/json-envelope.sh):
+#   0  collected (including an empty range — range.empty is true)
+#   2  invocation error (bad flags, both ref-modes, unresolvable ref)
+# gh being unavailable is a warning (verb-fallback still yields a valid
+# result), not an error.
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=lib/json-envelope.sh
+. "$SCRIPT_DIR/lib/json-envelope.sh"
+
+usage() { sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'; }
+
+FORMAT="text"
+FROM=""
+TO=""
+SINCE_LAST=0
+INCLUDE_MERGES=0
+ORIGIN=""
+GIT_LOG_FILE=""
+GH_MOCK=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --format)        [ $# -ge 2 ] || { printf 'changelog-collect: --format needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; FORMAT="$2"; shift 2 ;;
+    --from)          [ $# -ge 2 ] || { printf 'changelog-collect: --from needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; FROM="$2"; shift 2 ;;
+    --to)            [ $# -ge 2 ] || { printf 'changelog-collect: --to needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; TO="$2"; shift 2 ;;
+    --since-last-release) SINCE_LAST=1; shift ;;
+    --include-merges)     INCLUDE_MERGES=1; shift ;;
+    --origin)        [ $# -ge 2 ] || { printf 'changelog-collect: --origin needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; ORIGIN="$2"; shift 2 ;;
+    --git-log-file)  [ $# -ge 2 ] || { printf 'changelog-collect: --git-log-file needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; GIT_LOG_FILE="$2"; shift 2 ;;
+    --gh-mock)       [ $# -ge 2 ] || { printf 'changelog-collect: --gh-mock needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; GH_MOCK="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) printf 'changelog-collect: unknown argument: %s\n' "$1" >&2; exit "$ENVELOPE_EXIT_INVOCATION" ;;
+  esac
+done
+case "$FORMAT" in
+  text|json) ;;
+  *) printf 'changelog-collect: --format must be text or json (got: %s)\n' "$FORMAT" >&2; exit "$ENVELOPE_EXIT_INVOCATION" ;;
+esac
+if [ "$SINCE_LAST" -eq 1 ] && { [ -n "$FROM" ] || [ -n "$TO" ]; }; then
+  printf 'changelog-collect: pass either --since-last-release or --from/--to, not both\n' >&2
+  exit "$ENVELOPE_EXIT_INVOCATION"
+fi
+if [ "$SINCE_LAST" -eq 0 ] && { [ -z "$FROM" ] || [ -z "$TO" ]; }; then
+  printf 'changelog-collect: need --from and --to, or --since-last-release\n' >&2
+  exit "$ENVELOPE_EXIT_INVOCATION"
+fi
+if [ -n "$GIT_LOG_FILE" ] && [ ! -f "$GIT_LOG_FILE" ]; then
+  printf 'changelog-collect: --git-log-file not found: %s\n' "$GIT_LOG_FILE" >&2
+  exit "$ENVELOPE_EXIT_INVOCATION"
+fi
+
+RESULT=$(
+  FROM="$FROM" TO="$TO" SINCE_LAST="$SINCE_LAST" INCLUDE_MERGES="$INCLUDE_MERGES" \
+  ORIGIN="$ORIGIN" GIT_LOG_FILE="$GIT_LOG_FILE" GH_MOCK="$GH_MOCK" \
+  python3 <<'PYEOF'
+import os, re, sys, json, subprocess, shutil
+
+FROM = os.environ.get("FROM") or ""
+TO = os.environ.get("TO") or ""
+since_last = os.environ.get("SINCE_LAST") == "1"
+include_merges = os.environ.get("INCLUDE_MERGES") == "1"
+origin_in = os.environ.get("ORIGIN") or ""
+log_file = os.environ.get("GIT_LOG_FILE") or ""
+gh_mock = os.environ.get("GH_MOCK") or ""
+
+warnings = []
+US, RS = "\x1f", "\x1e"
+
+SECTION_ORDER = [("features", "Features"), ("fixes", "Fixes"), ("docs", "Docs"),
+                 ("refactoring", "Refactoring"), ("chores", "Chores"),
+                 ("security", "Security"), ("other", "Other")]
+LABEL_PRIORITY = ["security", "bug", "feature", "refactor", "design", "docs", "infra", "chore"]
+LABEL_SECTION = {"security": "security", "bug": "fixes", "feature": "features",
+                 "refactor": "refactoring", "design": "refactoring", "docs": "docs",
+                 "infra": "chores", "chore": "chores"}
+VERB_SECTION = {"feat": "features", "fix": "fixes", "docs": "docs",
+                "refactor": "refactoring", "perf": "refactoring", "chore": "chores",
+                "test": "chores", "build": "chores", "style": "chores", "ci": "chores"}
+VERB_RE = re.compile(r"^(feat|fix|docs|refactor|chore|test|build|perf|style|ci)(\([^)]+\))?:\s*")
+FILLER = {"via", "with", "for", "the", "a", "an"}
+
+
+def fail(msg, code="invocation"):
+    print(json.dumps({"exit": 2, "status": "error", "outputs": {},
+        "text": "changelog-collect: " + msg,
+        "errors": [{"code": code, "message": msg}]}))
+    sys.exit(0)
+
+
+def git(args):
+    return subprocess.run(["git"] + args, capture_output=True, text=True)
+
+
+def normalize_origin(url):
+    url = url.strip()
+    if not url:
+        return None
+    m = re.match(r"^git@([^:]+):(.+?)(?:\.git)?$", url)
+    if m:
+        return "https://%s/%s" % (m.group(1), m.group(2))
+    m = re.match(r"^https?://(.+?)(?:\.git)?$", url)
+    if m:
+        return "https://" + m.group(1)
+    return url
+
+
+# ---- resolve range + obtain the raw log stream -------------------------
+if log_file:
+    with open(log_file, encoding="utf-8") as fh:
+        raw = fh.read()
+    rng_from, rng_to = FROM or "(start)", TO or "HEAD"
+else:
+    if since_last:
+        d = git(["describe", "--tags", "--abbrev=0"])
+        if d.returncode == 0 and d.stdout.strip():
+            rng_from = d.stdout.strip()
+        else:
+            f = git(["rev-list", "--max-parents=0", "HEAD"])
+            first = f.stdout.strip().splitlines()[-1] if f.returncode == 0 and f.stdout.strip() else ""
+            if not first:
+                fail("cannot resolve a starting ref (no tags and no commits)")
+            rng_from = first
+            warnings.append("no tags found — starting from first commit %s" % first)
+        rng_to = "HEAD"
+    else:
+        for ref in (FROM, TO):
+            r = git(["rev-parse", "--verify", "--quiet", ref])
+            if r.returncode != 0:
+                fail("cannot resolve ref: %s" % ref)
+        rng_from, rng_to = FROM, TO
+    fmt = "%H" + US + "%h" + US + "%ct" + US + "%s" + US + "%b" + RS
+    args = ["log", "%s..%s" % (rng_from, rng_to), "--format=" + fmt]
+    if not include_merges:
+        args.insert(1, "--no-merges")
+    lg = git(args)
+    if lg.returncode != 0:
+        fail("git log failed: %s" % lg.stderr.strip())
+    raw = lg.stdout
+
+# ---- origin ------------------------------------------------------------
+if origin_in:
+    origin = normalize_origin(origin_in)
+elif not log_file:
+    r = git(["remote", "get-url", "origin"])
+    origin = normalize_origin(r.stdout) if r.returncode == 0 else None
+else:
+    origin = None
+
+# ---- parse records -----------------------------------------------------
+commits = []
+for rec in raw.split(RS):
+    rec = rec.strip("\n")
+    if not rec.strip():
+        continue
+    parts = rec.split(US)
+    if len(parts) < 4:
+        continue
+    full, abbrev, ct, subject = parts[0], parts[1], parts[2], parts[3]
+    body = parts[4] if len(parts) > 4 else ""
+    try:
+        ct = int(ct)
+    except ValueError:
+        ct = 0
+    text = subject + "\n" + body
+    issues = []
+    for n in re.findall(r"#(\d+)", text):
+        if n not in issues:
+            issues.append(n)
+    adrs = []
+    for n in re.findall(r"ADR-?(\d{1,4})", text, re.I):
+        tok = "%03d" % int(n)
+        if tok not in adrs:
+            adrs.append(tok)
+    pr_refs = re.findall(r"\(#(\d+)\)", subject)
+    pr_ref = pr_refs[-1] if pr_refs else None
+    commits.append({"full": full, "abbrev": abbrev, "ct": ct, "subject": subject,
+                    "issues": issues, "adrs": adrs, "prRef": pr_ref})
+
+# newest first
+commits.sort(key=lambda c: c["ct"], reverse=True)
+
+# ---- PR label lookup (label-primary categorization) --------------------
+gh_available = True
+label_cache = {}
+
+
+def lookup_labels(n):
+    if gh_mock:
+        path = os.path.join(gh_mock, "pr-view-%s-labels.json" % n)
+        if os.path.exists(path):
+            try:
+                data = json.load(open(path, encoding="utf-8"))
+                return [l.get("name") for l in data.get("labels", []) if l.get("name")]
+            except Exception:
+                return []
+        return []  # absent / no-labels -> fall through
+    if not shutil.which("gh"):
+        return None  # gh unavailable
+    r = subprocess.run(["gh", "pr", "view", n, "--json", "labels"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        return []  # non-existent PR / no labels -> fall through
+    try:
+        data = json.loads(r.stdout)
+        return [l.get("name") for l in data.get("labels", []) if l.get("name")]
+    except Exception:
+        return []
+
+
+pr_refs_unique = []
+for c in commits:
+    if c["prRef"] and c["prRef"] not in pr_refs_unique:
+        pr_refs_unique.append(c["prRef"])
+
+if not gh_mock and pr_refs_unique and not shutil.which("gh"):
+    gh_available = False
+    warnings.append("gh unavailable; falling back to verb-prefix categorization")
+else:
+    for n in pr_refs_unique:
+        labels = lookup_labels(n)
+        if labels is None:
+            gh_available = False
+            warnings.append("gh unavailable; falling back to verb-prefix categorization")
+            break
+        label_cache[n] = labels
+
+
+def section_from_labels(labels):
+    present = set(labels or [])
+    for lab in LABEL_PRIORITY:
+        if lab in present:
+            return LABEL_SECTION[lab]
+    return None
+
+
+def categorize(c):
+    if c["prRef"] in label_cache:
+        sec = section_from_labels(label_cache[c["prRef"]])
+        if sec:
+            return sec
+    m = VERB_RE.match(c["subject"])
+    if m:
+        return VERB_SECTION.get(m.group(1), "other")
+    return "other"
+
+
+def strip_subject(s):
+    s = VERB_RE.sub("", s)
+    while True:
+        new = re.sub(r"\s*\(#\d+\)\s*$", "", s)
+        if new == s:
+            break
+        s = new
+    return s.strip()
+
+
+def tokens(s):
+    return set(t for t in re.split(r"[^a-z0-9]+", s.lower()) if t and t not in FILLER)
+
+
+# ---- assign sections ---------------------------------------------------
+buckets = {sid: [] for sid, _ in SECTION_ORDER}
+for c in commits:
+    c["section"] = categorize(c)
+    c["stripped"] = strip_subject(c["subject"])
+    c["hasVerb"] = bool(VERB_RE.match(c["subject"]))
+    buckets[c["section"]].append(c)
+
+# ---- dedupe within each section ----------------------------------------
+def same_change(a, b):
+    if a["stripped"] and a["stripped"] == b["stripped"]:
+        return True
+    if a["prRef"] and a["prRef"] == b["prRef"]:
+        return True
+    if a["hasVerb"] and b["hasVerb"]:
+        ta, tb = tokens(a["stripped"]), tokens(b["stripped"])
+        if ta and tb:
+            overlap = len(ta & tb) / max(len(ta), len(tb))
+            if overlap >= 0.75:
+                return True
+    return False
+
+
+sections_out = []
+counts = {}
+for sid, title in SECTION_ORDER:
+    items = buckets[sid]  # newest first
+    groups = []
+    for c in items:
+        placed = False
+        for g in groups:
+            if same_change(g[0], c):
+                g.append(c)
+                placed = True
+                break
+        if not placed:
+            groups.append([c])
+    entries = []
+    for g in groups:
+        g.sort(key=lambda c: c["ct"], reverse=True)
+        canonical = g[0]
+        issues = []
+        adrs = []
+        for c in g:
+            for i in c["issues"]:
+                if i not in issues:
+                    issues.append(i)
+            for a in c["adrs"]:
+                if a not in adrs:
+                    adrs.append(a)
+        entries.append({
+            "canonicalSubject": canonical["stripped"] or canonical["subject"],
+            "shas": [c["abbrev"] for c in g],
+            "fullShas": [c["full"] for c in g],
+            "issues": issues,
+            "adrs": ["ADR-%s" % a for a in adrs],
+            "prRef": canonical["prRef"],
+        })
+    if entries:
+        sections_out.append({"id": sid, "title": title, "entries": entries})
+    counts[sid] = len(entries)
+
+# ---- title -------------------------------------------------------------
+if rng_to == "HEAD" and rng_from not in ("HEAD", "(start)"):
+    title = "Changelog since %s" % rng_from
+else:
+    title = "Changelog %s..%s" % (rng_from, rng_to)
+
+empty = len(commits) == 0
+outputs = {
+    "range": {"from": rng_from, "to": rng_to, "title": title, "empty": empty},
+    "origin": origin,
+    "ghAvailable": gh_available,
+    "sections": sections_out,
+    "counts": counts,
+    "warnings": warnings,
+}
+
+if empty:
+    text = "changelog-collect: no commits in %s..%s (empty range)" % (rng_from, rng_to)
+else:
+    parts = ["%d %s" % (counts[sid], title2.lower()) for sid, title2 in SECTION_ORDER if counts[sid]]
+    text = "changelog-collect: %s — %s" % (title, ", ".join(parts))
+    if warnings:
+        text += " [%s]" % "; ".join(warnings)
+
+print(json.dumps({"exit": 0, "status": "ok" if not empty else "empty",
+                  "outputs": outputs, "text": text, "errors": []}, ensure_ascii=False))
+PYEOF
+)
+
+EXIT_HINT=$(printf '%s' "$RESULT" | jq -r '.exit')
+STATUS=$(printf '%s' "$RESULT" | jq -r '.status')
+OUTPUTS=$(printf '%s' "$RESULT" | jq -c '.outputs')
+ERRORS=$(printf '%s' "$RESULT" | jq -c '.errors')
+
+if [ "$FORMAT" = "json" ]; then
+  print_envelope "changelog-collect" "$STATUS" "$OUTPUTS" "[]" "$ERRORS"
+else
+  printf '%s\n' "$(printf '%s' "$RESULT" | jq -r '.text')"
+fi
+
+case "$EXIT_HINT" in
+  0) exit "$ENVELOPE_EXIT_OK" ;;
+  *) exit "$ENVELOPE_EXIT_INVOCATION" ;;
+esac

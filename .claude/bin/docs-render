@@ -1,0 +1,216 @@
+#!/usr/bin/env bash
+# docs-render — splice marker-fenced doc sections deterministically (ADR-054).
+#
+# The mechanical half of the workflow-docs skill: marker-fenced section
+# omission, existing-file merge, and blank-line collapse, built on the shared
+# fences library (workflow-docs dialect). The skill decides which sections
+# appear and writes their prose; docs-render performs the byte-preserving
+# splice so content outside the markers is never clobbered.
+#
+# The skill passes the sections it decided to include as an ordered JSON array
+# of {"id": "...", "body": "## Heading\n\n..."} (the body includes the section
+# heading, because the workflow-docs start marker precedes the heading).
+#
+# Usage:
+#   bin/docs-render --file PATH --sections FILE [--dry-run] [--format text|json]
+#   bin/docs-render --file PATH --sections -            # read sections JSON from stdin
+#   bin/docs-render --file PATH --check-markers         # report marker health only
+#
+# Flags:
+#   --file PATH          target doc (README.md, design/architecture.md, ...)
+#   --sections FILE      ordered JSON array of {id, body}; `-` reads stdin
+#   --check-markers      parse and report marker health; write nothing
+#   --dry-run            render the merged result to stdout without writing
+#   --format text|json   default text; json emits the standard envelope
+#   -h, --help           print this header
+#
+# Exit codes (shared convention; see lib/json-envelope.sh):
+#   0  rendered (or markers healthy with --check-markers)
+#   1  markers malformed, or the file exists without any markers
+#      ("manual edits — cannot safely update"); the skill shows a diff and asks
+#   2  invocation error (bad flags, unreadable file/sections)
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=lib/json-envelope.sh
+. "$SCRIPT_DIR/lib/json-envelope.sh"
+
+usage() { sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'; }
+
+FORMAT="text"
+FILE=""
+SECTIONS=""
+CHECK_MARKERS=0
+DRY_RUN=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --format)        [ $# -ge 2 ] || { printf 'docs-render: --format needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; FORMAT="$2"; shift 2 ;;
+    --file)          [ $# -ge 2 ] || { printf 'docs-render: --file needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; FILE="$2"; shift 2 ;;
+    --sections)      [ $# -ge 2 ] || { printf 'docs-render: --sections needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; SECTIONS="$2"; shift 2 ;;
+    --check-markers) CHECK_MARKERS=1; shift ;;
+    --dry-run)       DRY_RUN=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) printf 'docs-render: unknown argument: %s\n' "$1" >&2; exit "$ENVELOPE_EXIT_INVOCATION" ;;
+  esac
+done
+case "$FORMAT" in
+  text|json) ;;
+  *) printf 'docs-render: --format must be text or json (got: %s)\n' "$FORMAT" >&2; exit "$ENVELOPE_EXIT_INVOCATION" ;;
+esac
+if [ -z "$FILE" ]; then
+  printf 'docs-render: --file is required\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"
+fi
+if [ "$CHECK_MARKERS" -eq 0 ] && [ -z "$SECTIONS" ]; then
+  printf 'docs-render: --sections is required (or use --check-markers)\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"
+fi
+
+SECTIONS_TEXT=""
+if [ "$CHECK_MARKERS" -eq 0 ]; then
+  if [ "$SECTIONS" = "-" ]; then
+    SECTIONS_TEXT="$(cat)"
+  elif [ -f "$SECTIONS" ]; then
+    SECTIONS_TEXT="$(cat "$SECTIONS")"
+  else
+    printf 'docs-render: --sections file not found: %s\n' "$SECTIONS" >&2
+    exit "$ENVELOPE_EXIT_INVOCATION"
+  fi
+fi
+
+RESULT=$(
+  FILE="$FILE" SECTIONS_TEXT="$SECTIONS_TEXT" CHECK_MARKERS="$CHECK_MARKERS" \
+  DRY_RUN="$DRY_RUN" LIB_DIR="$SCRIPT_DIR/lib" \
+  python3 <<'PYEOF'
+import os, sys, json, tempfile
+sys.path.insert(0, os.environ["LIB_DIR"])
+import fences
+
+path = os.environ["FILE"]
+check_markers = os.environ.get("CHECK_MARKERS") == "1"
+dry_run = os.environ.get("DRY_RUN") == "1"
+D = fences.WDOCS
+
+
+def out(exit_code, status, outputs, text, errors=None):
+    print(json.dumps({"exit": exit_code, "status": status, "outputs": outputs,
+                      "text": text, "errors": errors or []}, ensure_ascii=False))
+    sys.exit(0)
+
+
+def atomic_write(p, content):
+    d = os.path.dirname(os.path.abspath(p))
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".docs-render.")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(content)
+        os.replace(tmp, p)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+exists = os.path.isfile(path)
+text = ""
+if exists:
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+
+# --- marker-health only -------------------------------------------------
+if check_markers:
+    if not exists:
+        out(0, "ok", {"file": path, "markerHealth": "absent"},
+            "docs-render: %s does not exist yet" % path)
+    health, detail = fences.marker_health(text, D)
+    if health == "malformed":
+        out(1, "malformed", {"file": path, "markerHealth": "malformed"},
+            "docs-render: %s has malformed markers: %s" % (path, "; ".join(detail)),
+            [{"code": "malformed-markers", "message": "; ".join(detail)}])
+    out(0, "ok", {"file": path, "markerHealth": "ok", "zones": detail},
+        "docs-render: %s markers ok (%d zone(s))" % (path, len(detail)))
+
+# --- parse sections -----------------------------------------------------
+try:
+    sections = json.loads(os.environ.get("SECTIONS_TEXT") or "[]")
+    assert isinstance(sections, list)
+    for s in sections:
+        assert isinstance(s, dict) and "id" in s and "body" in s
+except Exception as e:
+    out(2, "error", {}, "docs-render: --sections must be a JSON array of {id, body}: %s" % e,
+        [{"code": "bad-sections", "message": str(e)}])
+
+new_ids = [s["id"] for s in sections]
+replaced, added, omitted = [], [], []
+
+# --- first run / no existing file: assemble fresh -----------------------
+if not exists:
+    parts = []
+    for s in sections:
+        parts.append("%s\n%s\n%s" % (D.marker(s["id"], "start"), s["body"],
+                                     D.marker(s["id"], "end")))
+        added.append(s["id"])
+    content = fences.collapse_blank_lines("\n\n".join(parts) + "\n")
+else:
+    try:
+        existing = [z.zone for z in fences.list_zones(text, D)]
+    except fences.FenceError as e:
+        out(1, "malformed", {"file": path, "markerHealth": "malformed"},
+            "docs-render: %s has malformed markers: %s" % (path, e),
+            [{"code": "malformed-markers", "message": str(e)}])
+    if not existing:
+        # Human-written file with no markers — the skill must show a diff
+        # and get explicit consent rather than silently overwriting.
+        out(1, "no-markers", {"file": path, "markerHealth": "none"},
+            "docs-render: %s has no workflow-docs markers — cannot safely update "
+            "(show a diff and ask before replacing)" % path,
+            [{"code": "no-markers", "message": "existing file has no markers"}])
+    content = text
+    for s in sections:
+        if s["id"] in existing:
+            content = fences.replace_zone(content, D, s["id"], s["body"])
+            replaced.append(s["id"])
+        else:
+            content = fences.upsert_zone(content, D, s["id"], s["body"])
+            added.append(s["id"])
+    for zid in existing:
+        if zid not in new_ids:
+            content = fences.omit_section(content, D, zid)
+            omitted.append(zid)
+    content = fences.collapse_blank_lines(content)
+
+content = content.rstrip("\n") + "\n"   # exactly one trailing newline
+wrote = False
+if dry_run:
+    text_out = content
+else:
+    atomic_write(path, content)
+    wrote = True
+    text_out = ("docs-render: %s — replaced %d, added %d, omitted %d"
+                % (path, len(replaced), len(added), len(omitted)))
+
+outputs = {"file": path, "wrote": wrote,
+           "sectionsReplaced": replaced, "sectionsAdded": added,
+           "sectionsOmitted": omitted,
+           "markerHealth": "ok" if exists else "created"}
+out(0, "ok", outputs, text_out)
+PYEOF
+)
+
+EXIT_HINT=$(printf '%s' "$RESULT" | jq -r '.exit')
+STATUS=$(printf '%s' "$RESULT" | jq -r '.status')
+OUTPUTS=$(printf '%s' "$RESULT" | jq -c '.outputs')
+ERRORS=$(printf '%s' "$RESULT" | jq -c '.errors')
+
+if [ "$FORMAT" = "json" ]; then
+  print_envelope "docs-render" "$STATUS" "$OUTPUTS" "[]" "$ERRORS"
+else
+  printf '%s\n' "$(printf '%s' "$RESULT" | jq -r '.text')"
+fi
+
+case "$EXIT_HINT" in
+  0) exit "$ENVELOPE_EXIT_OK" ;;
+  1) exit "$ENVELOPE_EXIT_DOMAIN" ;;
+  *) exit "$ENVELOPE_EXIT_INVOCATION" ;;
+esac

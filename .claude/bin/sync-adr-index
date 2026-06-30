@@ -1,0 +1,255 @@
+#!/usr/bin/env bash
+# sync-adr-index — regenerate the ADR index table in design/adr/README.md
+# from the current state of design/adr/adr-*.md.
+#
+# Implements ADR-023.
+#
+# Behaviour:
+#   - Scans design/adr/adr-NNN-*.md files in the current working directory.
+#   - Parses ADR number from filename, title from `# ADR-NNN: ...`,
+#     status from the first `**Status:**` line, and the optional phase
+#     from the first `**Phase:**` line (per ADR-032). When ANY ADR
+#     declares a Phase, the generated table gains a Phase column;
+#     otherwise the table stays 3-column for back-compat with unphased
+#     projects.
+#   - Rewrites the region between the marker fences in
+#     design/adr/README.md:
+#         <!-- adr-index:start -->
+#         ...generated table...
+#         <!-- adr-index:end -->
+#   - Editorial text outside the fence is preserved.
+#
+# Exit codes:
+#   0  success (index already in sync, or rewritten successfully)
+#   1  check-mode drift (only with --check; see stderr)
+#   2  invocation error (missing files, malformed input)
+#
+# Usage:
+#   bin/sync-adr-index            # rewrite if drift detected
+#   bin/sync-adr-index --check    # exit 1 on drift, do not modify
+
+set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# Args
+# ---------------------------------------------------------------------------
+
+CHECK_ONLY=0
+for arg in "$@"; do
+  case "$arg" in
+    --check) CHECK_ONLY=1 ;;
+    -h|--help)
+      sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0
+      ;;
+    *)
+      printf 'sync-adr-index: unknown argument: %s\n' "$arg" >&2
+      exit 2
+      ;;
+  esac
+done
+
+ADR_DIR="design/adr"
+INDEX_FILE="$ADR_DIR/README.md"
+START_MARKER="<!-- adr-index:start -->"
+END_MARKER="<!-- adr-index:end -->"
+
+if [ ! -d "$ADR_DIR" ]; then
+  printf 'sync-adr-index: no %s directory found (run from repo root)\n' "$ADR_DIR" >&2
+  exit 2
+fi
+
+if [ ! -f "$INDEX_FILE" ]; then
+  printf 'sync-adr-index: no %s found\n' "$INDEX_FILE" >&2
+  exit 2
+fi
+
+if ! grep -qF "$START_MARKER" "$INDEX_FILE" || ! grep -qF "$END_MARKER" "$INDEX_FILE"; then
+  printf 'sync-adr-index: marker fences not found in %s\n' "$INDEX_FILE" >&2
+  printf '  expected:\n    %s\n    %s\n' "$START_MARKER" "$END_MARKER" >&2
+  exit 2
+fi
+
+# ---------------------------------------------------------------------------
+# Build the new table
+# ---------------------------------------------------------------------------
+
+# Collect ADR files sorted by number.
+shopt -s nullglob
+adr_files=("$ADR_DIR"/adr-*.md)
+shopt -u nullglob
+
+if [ "${#adr_files[@]}" -eq 0 ]; then
+  printf 'sync-adr-index: no ADR files matching %s/adr-*.md\n' "$ADR_DIR" >&2
+  exit 2
+fi
+
+# Sort by ADR number embedded in the filename. ADR numbers are
+# zero-padded to three digits in the canonical layout, but tolerate
+# unpadded forms by extracting the numeric portion.
+sort_key() {
+  local f="$1"
+  local base
+  base="$(basename "$f")"
+  # Match adr-<digits>-...
+  if [[ "$base" =~ ^adr-([0-9]+)- ]]; then
+    printf '%010d\t%s\n' "$((10#${BASH_REMATCH[1]}))" "$f"
+  else
+    printf 'sync-adr-index: skipping malformed ADR filename: %s\n' "$base" >&2
+  fi
+}
+
+sorted_files=()
+while IFS= read -r line; do
+  # line is "<padded-num>\t<path>"
+  sorted_files+=("${line#*$'\t'}")
+done < <(
+  for f in "${adr_files[@]}"; do
+    sort_key "$f"
+  done | sort -k1,1n
+)
+
+# First pass: extract metadata per ADR. Two passes let us decide on
+# table shape (3-column vs 4-column with Phase) before we emit any rows.
+nums=()
+titles=()
+statuses=()
+phases=()
+any_phase=0
+
+for f in "${sorted_files[@]}"; do
+  base="$(basename "$f")"
+  # ADR number from filename.
+  if [[ "$base" =~ ^adr-([0-9]+)- ]]; then
+    num="${BASH_REMATCH[1]}"
+  else
+    continue
+  fi
+  # Title: first line beginning with "# ADR-".
+  title_line="$(grep -m1 '^# ADR-' "$f" || true)"
+  if [ -z "$title_line" ]; then
+    title="(no title found)"
+  else
+    # Strip "# ADR-NNN: " prefix.
+    title="${title_line#\# ADR-*: }"
+    title="${title#\# ADR-*:}"
+  fi
+  # Status: first line beginning with "**Status:**".
+  status_line="$(grep -m1 '^\*\*Status:\*\*' "$f" || true)"
+  if [ -z "$status_line" ]; then
+    status="(no status found)"
+  else
+    # Strip "**Status:** " prefix and any leading whitespace.
+    status="${status_line#\*\*Status:\*\*}"
+    status="${status# }"
+    # Render markdown links in status as plain ADR-NNN references for
+    # the table (e.g., "superseded by [ADR-022](...)" → "superseded by ADR-022").
+    status="$(printf '%s' "$status" | sed -E 's/\[([^]]+)\]\([^)]+\)/\1/g')"
+  fi
+  # Phase: optional, first line beginning with "**Phase:**" (ADR-032).
+  # Skip lines whose value is the literal "{{N}}" template placeholder.
+  phase=""
+  phase_line="$(grep -m1 '^\*\*Phase:\*\*' "$f" || true)"
+  if [ -n "$phase_line" ]; then
+    phase="${phase_line#\*\*Phase:\*\*}"
+    phase="${phase# }"
+    if [ "$phase" = "{{N}}" ]; then
+      phase=""
+    fi
+  fi
+  if [ -n "$phase" ]; then
+    any_phase=1
+  fi
+  nums+=("$num")
+  titles+=("$title")
+  statuses+=("$status")
+  phases+=("$phase")
+done
+
+# Build the table body. Emit 4-column form only when at least one ADR
+# is phase-tagged; otherwise stay 3-column for back-compat.
+new_table=""
+if [ "$any_phase" -eq 1 ]; then
+  new_table+="| ADR | Title | Status | Phase |"$'\n'
+  new_table+="|---|---|---|---|"$'\n'
+else
+  new_table+="| ADR | Title | Status |"$'\n'
+  new_table+="|---|---|---|"$'\n'
+fi
+
+for i in "${!nums[@]}"; do
+  num="${nums[$i]}"
+  title="${titles[$i]}"
+  status="${statuses[$i]}"
+  phase="${phases[$i]}"
+  base=""
+  for f in "${sorted_files[@]}"; do
+    if [[ "$(basename "$f")" =~ ^adr-${num}- ]]; then
+      base="$(basename "$f")"
+      break
+    fi
+  done
+  if [ "$any_phase" -eq 1 ]; then
+    # Empty phase column renders as an em-dash for readability.
+    [ -z "$phase" ] && phase="—"
+    new_table+="| [ADR-${num}](${base}) | ${title} | ${status} | ${phase} |"$'\n'
+  else
+    new_table+="| [ADR-${num}](${base}) | ${title} | ${status} |"$'\n'
+  fi
+done
+
+# ---------------------------------------------------------------------------
+# Splice into the README
+# ---------------------------------------------------------------------------
+
+# Write the new table to a temp file so awk can read it via getline. macOS
+# awk does not accept multi-line strings via -v, so the variable approach
+# is unreliable; the temp-file approach is portable.
+table_tmp="$(mktemp -t sync-adr-index.XXXXXX)"
+trap 'rm -f "$table_tmp"' EXIT
+printf '%s' "$new_table" > "$table_tmp"
+
+current="$(cat "$INDEX_FILE")"
+
+new_content="$(
+  awk -v start="$START_MARKER" -v end="$END_MARKER" -v tablefile="$table_tmp" '
+    BEGIN { mode = "before" }
+    {
+      if (mode == "before") {
+        print
+        if (index($0, start) > 0) {
+          mode = "inside"
+          print ""
+          while ((getline tline < tablefile) > 0) print tline
+          close(tablefile)
+          print ""
+        }
+      } else if (mode == "inside") {
+        if (index($0, end) > 0) {
+          print
+          mode = "after"
+        }
+      } else {
+        print
+      }
+    }
+  ' "$INDEX_FILE"
+)"
+
+# Compare. If unchanged, exit 0. Otherwise rewrite (or report drift in --check).
+if [ "$current" = "$new_content" ]; then
+  if [ "$CHECK_ONLY" -eq 1 ]; then
+    printf 'sync-adr-index: index is in sync\n'
+  fi
+  exit 0
+fi
+
+if [ "$CHECK_ONLY" -eq 1 ]; then
+  printf 'sync-adr-index: %s is out of sync with %s/adr-*.md\n' "$INDEX_FILE" "$ADR_DIR" >&2
+  printf '  run `bin/sync-adr-index` to update.\n' >&2
+  exit 1
+fi
+
+printf '%s\n' "$new_content" > "$INDEX_FILE"
+printf 'sync-adr-index: rewrote %s\n' "$INDEX_FILE"
+exit 0

@@ -1,0 +1,320 @@
+#!/usr/bin/env bash
+# pr-context — extract PR-packaging context as JSON for pr-review-packager
+# (ADR-054).
+#
+# The deterministic spine the pr-review-packager skill used to run inline:
+# the 3-priority issue-number fallback (branch -> commit subjects -> newest
+# prompt), ADR-token extraction and glob resolution (including ADR-NNN..MMM
+# ranges and comma lists of bare numbers that share one anchor),
+# conventional-commit change grouping, a PR-title draft, and the
+# design-questions carry-forward
+# read (grouped by target-issue). The skill writes the PR narrative, owns the
+# approval gate, and calls gh pr create — none of which lives here.
+#
+# Offline harness (for fixtures/tests):
+#   --git-log-file FILE  read "<sha>\t<subject>" lines instead of running git
+#
+# Usage:
+#   bin/pr-context [--base main] [--branch NAME] [--git-log-file FILE]
+#       [--prompts-dir prompts] [--notes-dir notes] [--adr-dir design/adr]
+#       [--format text|json] [-h]
+#
+# Exit codes (shared convention; see lib/json-envelope.sh):
+#   0  context extracted (issueSource may be "none" — reported, not an error)
+#   2  invocation error (bad flags, unreadable --git-log-file)
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=lib/json-envelope.sh
+. "$SCRIPT_DIR/lib/json-envelope.sh"
+
+usage() { sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'; }
+
+FORMAT="text"
+BASE="main"
+BRANCH=""
+GIT_LOG_FILE=""
+PROMPTS_DIR="prompts"
+NOTES_DIR="notes"
+ADR_DIR="design/adr"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --format)       [ $# -ge 2 ] || { printf 'pr-context: --format needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; FORMAT="$2"; shift 2 ;;
+    --base)         [ $# -ge 2 ] || { printf 'pr-context: --base needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; BASE="$2"; shift 2 ;;
+    --branch)       [ $# -ge 2 ] || { printf 'pr-context: --branch needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; BRANCH="$2"; shift 2 ;;
+    --git-log-file) [ $# -ge 2 ] || { printf 'pr-context: --git-log-file needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; GIT_LOG_FILE="$2"; shift 2 ;;
+    --prompts-dir)  [ $# -ge 2 ] || { printf 'pr-context: --prompts-dir needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; PROMPTS_DIR="$2"; shift 2 ;;
+    --notes-dir)    [ $# -ge 2 ] || { printf 'pr-context: --notes-dir needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; NOTES_DIR="$2"; shift 2 ;;
+    --adr-dir)      [ $# -ge 2 ] || { printf 'pr-context: --adr-dir needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; ADR_DIR="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) printf 'pr-context: unknown argument: %s\n' "$1" >&2; exit "$ENVELOPE_EXIT_INVOCATION" ;;
+  esac
+done
+case "$FORMAT" in
+  text|json) ;;
+  *) printf 'pr-context: --format must be text or json (got: %s)\n' "$FORMAT" >&2; exit "$ENVELOPE_EXIT_INVOCATION" ;;
+esac
+if [ -n "$GIT_LOG_FILE" ] && [ ! -f "$GIT_LOG_FILE" ]; then
+  printf 'pr-context: --git-log-file not found: %s\n' "$GIT_LOG_FILE" >&2
+  exit "$ENVELOPE_EXIT_INVOCATION"
+fi
+
+RESULT=$(
+  BASE="$BASE" BRANCH="$BRANCH" GIT_LOG_FILE="$GIT_LOG_FILE" LIB_DIR="$SCRIPT_DIR/lib" \
+  PROMPTS_DIR="$PROMPTS_DIR" NOTES_DIR="$NOTES_DIR" ADR_DIR="$ADR_DIR" \
+  python3 <<'PYEOF'
+import os, re, sys, json, glob, subprocess
+sys.path.insert(0, os.environ["LIB_DIR"])
+from carryforward_read import find_blocks, parse_block
+
+base = os.environ.get("BASE") or "main"
+branch = os.environ.get("BRANCH") or ""
+log_file = os.environ.get("GIT_LOG_FILE") or ""
+prompts_dir = os.environ.get("PROMPTS_DIR") or "prompts"
+notes_dir = os.environ.get("NOTES_DIR") or "notes"
+adr_dir = os.environ.get("ADR_DIR") or "design/adr"
+warnings = []
+
+VERB_RE = re.compile(r"^(feat|fix|docs|refactor|chore|test|perf|ci|build|infra|style)(\([^)]+\))?:\s*")
+VERB_ORDER = ["feat", "fix", "docs", "refactor", "chore", "test", "perf",
+              "ci", "build", "infra", "style", "other"]
+
+
+def git(args):
+    return subprocess.run(["git"] + args, capture_output=True, text=True)
+
+
+if not branch:
+    if log_file:
+        branch = ""
+    else:
+        r = git(["symbolic-ref", "--short", "HEAD"])
+        branch = r.stdout.strip() if r.returncode == 0 else ""
+
+# ---- commits ahead of base: list of (sha, subject), newest first ------
+commits = []
+if log_file:
+    with open(log_file, encoding="utf-8") as fh:
+        raw = fh.read()
+    for line in raw.split("\n"):
+        if not line.strip():
+            continue
+        parts = line.split("\t", 1)
+        sha = parts[0]
+        subject = parts[1] if len(parts) > 1 else ""
+        commits.append((sha, subject))
+else:
+    r = git(["log", "%s..HEAD" % base, "--format=%H%x09%s"])
+    if r.returncode == 0:
+        for line in r.stdout.split("\n"):
+            if not line.strip():
+                continue
+            parts = line.split("\t", 1)
+            commits.append((parts[0], parts[1] if len(parts) > 1 else ""))
+
+subjects = [s for _, s in commits]
+
+
+def strip_trailing_refs(s):
+    while True:
+        m = re.search(r"\s*\(([^)]*)\)\s*$", s)
+        if not m:
+            break
+        inside = m.group(1)
+        if "ADR" in inside.upper() or "#" in inside:
+            s = s[:m.start()]
+        else:
+            break
+    return s.strip()
+
+
+# ---- issue number: 3-priority fallback --------------------------------
+issue_number = None
+issue_source = "none"
+
+# 1. branch: issue-(\d+)- , then trailing -(\d+)$ , then #(\d+)
+if branch:
+    m = re.search(r"issue-(\d+)-", branch)
+    if not m:
+        m = re.search(r"-(\d+)$", branch)
+    if not m:
+        m = re.search(r"#(\d+)", branch)
+    if m:
+        issue_number = m.group(1)
+        issue_source = "branch"
+
+# 2. commit subjects: first unique #(\d+), most-recent first
+if issue_number is None:
+    for subj in subjects:  # already newest-first
+        mm = re.search(r"#(\d+)", subj)
+        if mm:
+            issue_number = mm.group(1)
+            issue_source = "commit"
+            break
+
+# 3. newest prompt file prompts/issue-(\d+)-*.md
+prompt_files = []
+for p in glob.glob(os.path.join(prompts_dir, "issue-*.md")):
+    bn = os.path.basename(p)
+    mm = re.match(r"^issue-(\d+)-", bn)
+    if mm:
+        try:
+            mtime = os.path.getmtime(p)
+        except OSError:
+            mtime = 0
+        prompt_files.append((mtime, bn, p, mm.group(1)))
+# newest mtime first; tie-break by filename descending for determinism
+prompt_files.sort(key=lambda t: (t[0], t[1]), reverse=True)
+newest_prompt = prompt_files[0] if prompt_files else None
+
+if issue_number is None and newest_prompt is not None:
+    issue_number = newest_prompt[3]
+    issue_source = "prompt"
+
+issue_body = str(int(issue_number)) if issue_number is not None else None
+
+# ---- ADR tokens: branch + commit subjects + newest prompt content -----
+adr_scan_text = branch + "\n" + "\n".join(subjects)
+if newest_prompt is not None:
+    try:
+        with open(newest_prompt[2], encoding="utf-8") as fh:
+            adr_scan_text += "\n" + fh.read()
+    except OSError:
+        pass
+adr_tokens = []
+
+
+def _add_adr(num):
+    tok = "ADR-%03d" % num
+    if tok not in adr_tokens:
+        adr_tokens.append(tok)
+
+
+# Each ADR anchor is "ADR-?<digits>" optionally followed by a run of range
+# (`..`) or comma tails that share the anchor, e.g. a commit subject
+# "ADR-001..004" or "ADR-010,012". To avoid swallowing ordinary numeric
+# prose, a comma tail is consumed ONLY when the number is tight against the
+# comma (no whitespace) — so "ADR-013, 2026 cleanup" or "(ADR-013, #17)"
+# keeps just ADR-013, while "ADR-010,012" expands. Spaced comma lists that
+# repeat the prefix ("ADR-010, ADR-012") are still captured because each
+# prefixed token is an independent anchor. Ranges expand inclusive; a
+# defensive cap keeps a pathological span from exploding.
+_ADR_ANCHOR = re.compile(
+    r"ADR-?(\d+)((?:\s*\.\.\s*(?:ADR-?)?\d+|,(?:ADR-?)?\d+)*)", re.I)
+_ADR_TAIL = re.compile(r"(\.\.|,)\s*(?:ADR-?)?(\d+)", re.I)
+_ADR_RANGE_CAP = 64
+
+for m in _ADR_ANCHOR.finditer(adr_scan_text):
+    prev = int(m.group(1))
+    _add_adr(prev)
+    for tm in _ADR_TAIL.finditer(m.group(2) or ""):
+        nxt = int(tm.group(2))
+        if tm.group(1) == "..":
+            lo, hi = (prev, nxt) if prev <= nxt else (nxt, prev)
+            if hi - lo <= _ADR_RANGE_CAP:
+                for k in range(lo, hi + 1):
+                    _add_adr(k)
+            else:
+                # Span too wide to be a real ADR range; keep only the endpoints.
+                _add_adr(lo)
+                _add_adr(hi)
+        else:
+            _add_adr(nxt)
+        prev = nxt
+adrs = []
+for tok in adr_tokens:
+    num = tok.split("-")[1]
+    matches = sorted(glob.glob(os.path.join(adr_dir, "adr-%s-*.md" % num)))
+    path = None
+    if matches:
+        # Normalise to a cwd-relative path so output is stable regardless of
+        # how --adr-dir was spelled (absolute, relative, trailing slash) or
+        # whether cwd is reached through a symlink. os.getcwd() returns the
+        # physical path while abspath keeps the logical one, so a plain
+        # relpath would diverge under a symlinked cwd (e.g. macOS /tmp ->
+        # /private/tmp, or an export tree checked out below a symlink) and
+        # fall back to a non-portable absolute path. Resolve both sides
+        # first so the relative result is symlink-stable.
+        rel = os.path.relpath(os.path.realpath(matches[0]), os.path.realpath(os.curdir))
+        path = matches[0] if rel.startswith("..") else rel
+    adrs.append({"token": tok, "path": path, "resolved": bool(matches)})
+
+# ---- commit groups: by verb, oldest-first within group ----------------
+groups = {}
+for sha, subj in reversed(commits):  # oldest-first
+    m = VERB_RE.match(subj)
+    verb = m.group(1) if m else "other"
+    groups.setdefault(verb, []).append(strip_trailing_refs(subj))
+commit_groups = [{"verb": v, "bullets": groups[v]} for v in VERB_ORDER if v in groups]
+
+# ---- PR title: newest commit subject, refs stripped -------------------
+pr_title = strip_trailing_refs(subjects[0]) if subjects else None
+
+# ---- carry-forward: notes/eval-issue-NNN.md design-questions ----------
+carry_forward = []
+if issue_number is not None:
+    padded = "%03d" % int(issue_number)
+    note_path = os.path.join(notes_dir, "eval-issue-%s.md" % padded)
+    if os.path.isfile(note_path):
+        with open(note_path, encoding="utf-8") as fh:
+            text = fh.read()
+        grouped = {}
+        order = []
+        for _, blines in find_blocks(text):
+            entries, errs = parse_block(blines)
+            if errs:
+                warnings.append("malformed design-questions block in %s" % note_path)
+            for e in entries:
+                ti = e.get("target-issue")
+                if not ti:
+                    continue
+                key = ti.lstrip("#")
+                if key not in grouped:
+                    grouped[key] = []
+                    order.append(key)
+                grouped[key].append({"title": e.get("title", ""),
+                                     "context": e.get("context", "")})
+        for key in sorted(order, key=lambda k: int(k) if k.isdigit() else 1 << 30):
+            carry_forward.append({"targetIssue": key, "entries": grouped[key]})
+
+outputs = {
+    "branch": branch or None,
+    "base": base,
+    "issueNumber": issue_body,
+    "issueSource": issue_source,
+    "adrs": adrs,
+    "commitGroups": commit_groups,
+    "prTitle": pr_title,
+    "carryForward": carry_forward,
+    "warnings": warnings,
+}
+
+bits = ["issue %s (%s)" % (issue_body or "none", issue_source),
+        "%d ADR ref(s)" % len(adrs),
+        "%d commit group(s)" % len(commit_groups),
+        "%d carry-forward target(s)" % len(carry_forward)]
+text = "pr-context: " + ", ".join(bits)
+if warnings:
+    text += " [%s]" % "; ".join(warnings)
+
+print(json.dumps({"exit": 0, "status": "ok", "outputs": outputs,
+                  "text": text, "errors": []}, ensure_ascii=False))
+PYEOF
+)
+
+EXIT_HINT=$(printf '%s' "$RESULT" | jq -r '.exit')
+STATUS=$(printf '%s' "$RESULT" | jq -r '.status')
+OUTPUTS=$(printf '%s' "$RESULT" | jq -c '.outputs')
+ERRORS=$(printf '%s' "$RESULT" | jq -c '.errors')
+
+if [ "$FORMAT" = "json" ]; then
+  print_envelope "pr-context" "$STATUS" "$OUTPUTS" "[]" "$ERRORS"
+else
+  printf '%s\n' "$(printf '%s' "$RESULT" | jq -r '.text')"
+fi
+
+case "$EXIT_HINT" in
+  0) exit "$ENVELOPE_EXIT_OK" ;;
+  *) exit "$ENVELOPE_EXIT_INVOCATION" ;;
+esac

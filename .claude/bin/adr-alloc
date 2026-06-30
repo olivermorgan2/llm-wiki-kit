@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+# adr-alloc — allocate the next ADR number, date, slug, and index-row stub
+# (ADR-054).
+#
+# Removes "the LLM counts files" from the adr-writer loop. This is the
+# deterministic spine only: it scans design/adr/ for the highest existing
+# adr-NNN-*.md, returns the next number (zero-padded to three digits),
+# today's date, a kebab slug, the target filename/path, and an index-row stub
+# matching bin/sync-adr-index's column shape. It writes nothing — adr-writer
+# renders the decision prose from templates/adr-template.md and
+# bin/sync-adr-index owns the index rewrite.
+#
+# Usage:
+#   bin/adr-alloc [--dir design/adr] [--title "..."] [--slug short-title]
+#                 [--date YYYY-MM-DD] [--phase N] [--format text|json] [-h]
+#
+# Flags:
+#   --dir DIR            ADR directory (default design/adr)
+#   --title STR          decision title (used for the slug and the index stub)
+#   --slug STR           explicit kebab slug; overrides slug derived from --title
+#   --date YYYY-MM-DD     stamp date (default today)
+#   --phase N            optional build-out-plan phase (ADR-032)
+#   --format text|json   default text; json emits the standard envelope
+#   -h, --help           print this header
+#
+# Exit codes (shared convention; see lib/json-envelope.sh):
+#   0  next allocation computed
+#   1  the computed filename already exists on disk (domain failure)
+#   2  invocation error (bad flags, missing/unscannable --dir)
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=lib/json-envelope.sh
+. "$SCRIPT_DIR/lib/json-envelope.sh"
+
+usage() { sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'; }
+
+FORMAT="text"
+DIR="design/adr"
+TITLE=""
+SLUG=""
+DATE=""
+PHASE=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --format) [ $# -ge 2 ] || { printf 'adr-alloc: --format needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; FORMAT="$2"; shift 2 ;;
+    --dir)    [ $# -ge 2 ] || { printf 'adr-alloc: --dir needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; DIR="$2"; shift 2 ;;
+    --title)  [ $# -ge 2 ] || { printf 'adr-alloc: --title needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; TITLE="$2"; shift 2 ;;
+    --slug)   [ $# -ge 2 ] || { printf 'adr-alloc: --slug needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; SLUG="$2"; shift 2 ;;
+    --date)   [ $# -ge 2 ] || { printf 'adr-alloc: --date needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; DATE="$2"; shift 2 ;;
+    --phase)  [ $# -ge 2 ] || { printf 'adr-alloc: --phase needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; PHASE="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) printf 'adr-alloc: unknown argument: %s\n' "$1" >&2; exit "$ENVELOPE_EXIT_INVOCATION" ;;
+  esac
+done
+case "$FORMAT" in
+  text|json) ;;
+  *) printf 'adr-alloc: --format must be text or json (got: %s)\n' "$FORMAT" >&2; exit "$ENVELOPE_EXIT_INVOCATION" ;;
+esac
+if [ ! -d "$DIR" ]; then
+  printf 'adr-alloc: directory not found: %s\n' "$DIR" >&2
+  exit "$ENVELOPE_EXIT_INVOCATION"
+fi
+if [ -n "$DATE" ] && ! printf '%s' "$DATE" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+  printf 'adr-alloc: --date must be YYYY-MM-DD (got: %s)\n' "$DATE" >&2
+  exit "$ENVELOPE_EXIT_INVOCATION"
+fi
+[ -z "$DATE" ] && DATE="$(date +%Y-%m-%d)"
+
+RESULT=$(
+  DIR="$DIR" TITLE="$TITLE" SLUG="$SLUG" DATE="$DATE" PHASE="$PHASE" \
+  python3 <<'PYEOF'
+import os, re, json, glob
+
+d = os.environ["DIR"]
+title = os.environ.get("TITLE") or ""
+slug_in = os.environ.get("SLUG") or ""
+date = os.environ["DATE"]
+phase = os.environ.get("PHASE") or ""
+
+
+def slugify(s):
+    s = s.lower()
+    s = re.sub(r"[^a-z0-9]+", "-", s)
+    return s.strip("-")
+
+
+highest = 0
+for path in glob.glob(os.path.join(d, "adr-*.md")):
+    m = re.match(r"^adr-([0-9]+)-", os.path.basename(path))
+    if m:
+        highest = max(highest, int(m.group(1)))
+nxt = highest + 1
+number = "%03d" % nxt
+
+slug = slug_in.strip() if slug_in else slugify(title)
+if not slug:
+    slug = "untitled"
+
+filename = "adr-%s-%s.md" % (number, slug)
+path = os.path.join(d, filename)
+exists = os.path.exists(path)
+
+display_title = title if title else "(title)"
+index_stub = "| [ADR-%s](%s) | %s | proposed |" % (number, filename, display_title)
+
+outputs = {
+    "number": number,
+    "numberInt": nxt,
+    "date": date,
+    "slug": slug,
+    "filename": filename,
+    "path": path,
+    "title": title or None,
+    "phase": int(phase) if phase else None,
+    "indexRowStub": index_stub,
+}
+
+if exists:
+    status, exit_code = "exists", 1
+    text = "adr-alloc: computed file already exists: %s" % path
+else:
+    status, exit_code = "ok", 0
+    text = ("adr-alloc: next is ADR-%s (%s) — %s, status proposed, date %s"
+            % (number, slug, path, date))
+
+print(json.dumps({"exit": exit_code, "status": status, "outputs": outputs,
+                  "text": text, "errors": []}, ensure_ascii=False))
+PYEOF
+)
+
+EXIT_HINT=$(printf '%s' "$RESULT" | jq -r '.exit')
+STATUS=$(printf '%s' "$RESULT" | jq -r '.status')
+OUTPUTS=$(printf '%s' "$RESULT" | jq -c '.outputs')
+ERRORS=$(printf '%s' "$RESULT" | jq -c '.errors')
+
+if [ "$FORMAT" = "json" ]; then
+  print_envelope "adr-alloc" "$STATUS" "$OUTPUTS" "[]" "$ERRORS"
+else
+  printf '%s\n' "$(printf '%s' "$RESULT" | jq -r '.text')"
+fi
+
+case "$EXIT_HINT" in
+  0) exit "$ENVELOPE_EXIT_OK" ;;
+  1) exit "$ENVELOPE_EXIT_DOMAIN" ;;
+  *) exit "$ENVELOPE_EXIT_INVOCATION" ;;
+esac

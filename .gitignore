@@ -1,0 +1,31 @@
+# macOS
+.DS_Store
+._*
+
+# Editor / IDE junk
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Backup and temp files
+*.bak
+*.bak.*
+*.tmp
+
+# Claude Code — per-session and per-machine state.
+# Note: .claude/skills/ is NOT ignored — that's where the installed kit lives.
+.claude/worktrees/
+.claude/settings.local.json
+# Idempotency receipts are local per-run state, not committed artefacts
+# (see docs/receipts.md).
+.claude/receipts/
+
+# Common build outputs (uncomment as your project requires)
+# node_modules/
+# __pycache__/
+# *.pyc
+# dist/
+# build/
+# target/
+# .venv/

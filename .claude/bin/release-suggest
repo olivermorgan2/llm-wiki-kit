@@ -1,0 +1,372 @@
+#!/usr/bin/env bash
+# release-suggest — deterministically collect version-bump signals from a
+# release range and suggest major | minor | patch as JSON (ADR-054).
+#
+# This is the deterministic spine the /release skill used to run inline in
+# the prompt: scan commits, ADR signals, and BREAKING markers since the last
+# tag and classify the next semver bump. The helper is ADVISORY ONLY — it
+# emits a suggestion, the confidence behind it, and the explicit signals and
+# warnings it saw. It writes nothing and performs no tagging, committing,
+# GitHub release creation, or publishing. The /release skill (and the human)
+# keep final judgment, approval, changelog prose, tagging, and publishing.
+#
+# It reuses bin/changelog-collect for the categorized commit tally (the
+# single source of truth for feat/fix/docs/chore categorization) and adds the
+# bump-tier signals changelog-collect does not expose: BREAKING-CHANGE
+# markers, conventional `!` breaking bangs, `breaking` PR labels, ADR
+# supersede/status-change markers, and new-ADR additions.
+#
+# Signal -> tier (highest tier present wins; conservative — it proposes, the
+# human confirms or overrides):
+#   major  BREAKING CHANGE marker, a conventional `!` bang, a `breaking` PR
+#          label, or an ADR supersede / status-change marker
+#   minor  one or more feature commits, or a new ADR introduced in the range
+#   patch  only fix/docs/chore/refactor commits and no higher signal
+#
+# Offline harness (for fixtures/tests, mirroring changelog-collect):
+#   --git-log-file FILE  read the raw %x1f/%x1e stream instead of running git
+#   --gh-mock DIR        read PR labels from DIR/pr-view-<N>-labels.json
+#                        (same convention as changelog-collect) instead of gh
+# With both set, the helper is a pure function of its inputs.
+#
+# Usage:
+#   bin/release-suggest (--from REF --to REF | --since-last-release)
+#       [--include-merges] [--git-log-file FILE] [--gh-mock DIR]
+#       [--format text|json] [-h]
+#
+# Exit codes (shared convention; see lib/json-envelope.sh):
+#   0  suggested (including an empty range — range.empty is true, bump null)
+#   2  invocation error (bad flags, both ref-modes, unresolvable ref)
+# gh being unavailable is a warning (commit-message signals still yield a
+# valid suggestion), not an error.
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=lib/json-envelope.sh
+. "$SCRIPT_DIR/lib/json-envelope.sh"
+
+usage() { sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'; }
+
+FORMAT="text"
+FROM=""
+TO=""
+SINCE_LAST=0
+INCLUDE_MERGES=0
+GIT_LOG_FILE=""
+GH_MOCK=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --format)        [ $# -ge 2 ] || { printf 'release-suggest: --format needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; FORMAT="$2"; shift 2 ;;
+    --from)          [ $# -ge 2 ] || { printf 'release-suggest: --from needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; FROM="$2"; shift 2 ;;
+    --to)            [ $# -ge 2 ] || { printf 'release-suggest: --to needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; TO="$2"; shift 2 ;;
+    --since-last-release) SINCE_LAST=1; shift ;;
+    --include-merges)     INCLUDE_MERGES=1; shift ;;
+    --git-log-file)  [ $# -ge 2 ] || { printf 'release-suggest: --git-log-file needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; GIT_LOG_FILE="$2"; shift 2 ;;
+    --gh-mock)       [ $# -ge 2 ] || { printf 'release-suggest: --gh-mock needs an argument\n' >&2; exit "$ENVELOPE_EXIT_INVOCATION"; }; GH_MOCK="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) printf 'release-suggest: unknown argument: %s\n' "$1" >&2; exit "$ENVELOPE_EXIT_INVOCATION" ;;
+  esac
+done
+case "$FORMAT" in
+  text|json) ;;
+  *) printf 'release-suggest: --format must be text or json (got: %s)\n' "$FORMAT" >&2; exit "$ENVELOPE_EXIT_INVOCATION" ;;
+esac
+if [ "$SINCE_LAST" -eq 1 ] && { [ -n "$FROM" ] || [ -n "$TO" ]; }; then
+  printf 'release-suggest: pass either --since-last-release or --from/--to, not both\n' >&2
+  exit "$ENVELOPE_EXIT_INVOCATION"
+fi
+if [ "$SINCE_LAST" -eq 0 ] && { [ -z "$FROM" ] || [ -z "$TO" ]; }; then
+  printf 'release-suggest: need --from and --to, or --since-last-release\n' >&2
+  exit "$ENVELOPE_EXIT_INVOCATION"
+fi
+if [ -n "$GIT_LOG_FILE" ] && [ ! -f "$GIT_LOG_FILE" ]; then
+  printf 'release-suggest: --git-log-file not found: %s\n' "$GIT_LOG_FILE" >&2
+  exit "$ENVELOPE_EXIT_INVOCATION"
+fi
+
+RESULT=$(
+  BIN_DIR="$SCRIPT_DIR" \
+  FROM="$FROM" TO="$TO" SINCE_LAST="$SINCE_LAST" INCLUDE_MERGES="$INCLUDE_MERGES" \
+  GIT_LOG_FILE="$GIT_LOG_FILE" GH_MOCK="$GH_MOCK" \
+  python3 <<'PYEOF'
+import os, re, sys, json, subprocess, shutil
+
+BIN_DIR = os.environ["BIN_DIR"]
+FROM = os.environ.get("FROM") or ""
+TO = os.environ.get("TO") or ""
+since_last = os.environ.get("SINCE_LAST") == "1"
+include_merges = os.environ.get("INCLUDE_MERGES") == "1"
+log_file = os.environ.get("GIT_LOG_FILE") or ""
+gh_mock = os.environ.get("GH_MOCK") or ""
+
+warnings = []
+US, RS = "\x1f", "\x1e"
+
+# Conventional-commit verb prefix, with an optional `!` breaking bang.
+VERB_RE = re.compile(r"^(feat|fix|docs|refactor|chore|test|build|perf|style|ci)(\([^)]+\))?(!)?:\s*", re.I)
+FEAT_RE = re.compile(r"^feat(\([^)]+\))?!?:\s*", re.I)
+# BREAKING CHANGE / BREAKING-CHANGE, but not "BREAKING CHANGES" (the negative
+# lookahead for a letter excludes the plural so prose can't false-trigger).
+BREAKING_RE = re.compile(r"BREAKING[ -]CHANGE(?![A-Za-z])", re.I)
+SUPERSEDE_RE = re.compile(r"supersed", re.I)
+NEW_ADR_RE = re.compile(r"\b(add|adds|added|new|introduce|introduces|draft|drafts)\b[^\n]{0,40}?ADR-?\d", re.I)
+ADR_TOKEN_RE = re.compile(r"ADR-?(\d{1,4})", re.I)
+
+
+def fail(msg):
+    print(json.dumps({"exit": 2, "status": "error", "outputs": {},
+        "text": "release-suggest: " + msg,
+        "errors": [{"code": "invocation", "message": msg}]}))
+    sys.exit(0)
+
+
+def git(args):
+    return subprocess.run(["git"] + args, capture_output=True, text=True)
+
+
+# ---- resolve range + obtain the raw log stream -------------------------
+if log_file:
+    with open(log_file, encoding="utf-8") as fh:
+        raw = fh.read()
+    rng_from, rng_to = FROM or "(start)", TO or "HEAD"
+else:
+    if since_last:
+        d = git(["describe", "--tags", "--abbrev=0"])
+        if d.returncode == 0 and d.stdout.strip():
+            rng_from = d.stdout.strip()
+        else:
+            f = git(["rev-list", "--max-parents=0", "HEAD"])
+            first = f.stdout.strip().splitlines()[-1] if f.returncode == 0 and f.stdout.strip() else ""
+            if not first:
+                fail("cannot resolve a starting ref (no tags and no commits)")
+            rng_from = first
+            warnings.append("no tags found — starting from first commit %s" % first)
+        rng_to = "HEAD"
+    else:
+        for ref in (FROM, TO):
+            r = git(["rev-parse", "--verify", "--quiet", ref])
+            if r.returncode != 0:
+                fail("cannot resolve ref: %s" % ref)
+        rng_from, rng_to = FROM, TO
+    fmt = "%H" + US + "%h" + US + "%ct" + US + "%s" + US + "%b" + RS
+    args = ["log", "%s..%s" % (rng_from, rng_to), "--format=" + fmt]
+    if not include_merges:
+        args.insert(1, "--no-merges")
+    lg = git(args)
+    if lg.returncode != 0:
+        fail("git log failed: %s" % lg.stderr.strip())
+    raw = lg.stdout
+
+# ---- parse records (subject + body, unlike changelog-collect) ----------
+commits = []
+for rec in raw.split(RS):
+    rec = rec.strip("\n")
+    if not rec.strip():
+        continue
+    parts = rec.split(US)
+    if len(parts) < 4:
+        continue
+    full, abbrev, ct, subject = parts[0], parts[1], parts[2], parts[3]
+    body = parts[4] if len(parts) > 4 else ""
+    try:
+        ct = int(ct)
+    except ValueError:
+        ct = 0
+    pr_refs = re.findall(r"\(#(\d+)\)", subject)
+    pr_ref = pr_refs[-1] if pr_refs else None
+    commits.append({"full": full, "abbrev": abbrev, "ct": ct,
+                    "subject": subject, "body": body, "text": subject + "\n" + body,
+                    "prRef": pr_ref})
+commits.sort(key=lambda c: c["ct"], reverse=True)
+empty = len(commits) == 0
+
+# ---- reuse changelog-collect for the categorized commit tally ----------
+counts = {}
+gh_available = True
+cc_cmd = [os.path.join(BIN_DIR, "changelog-collect"),
+          "--from", rng_from, "--to", rng_to, "--format", "json"]
+if include_merges:
+    cc_cmd.append("--include-merges")
+if log_file:
+    cc_cmd += ["--git-log-file", log_file]
+if gh_mock:
+    cc_cmd += ["--gh-mock", gh_mock]
+cc = subprocess.run(cc_cmd, capture_output=True, text=True)
+if cc.returncode == 0:
+    try:
+        cc_out = json.loads(cc.stdout).get("outputs", {})
+        counts = cc_out.get("counts", {}) or {}
+        gh_available = cc_out.get("ghAvailable", True)
+        for w in cc_out.get("warnings", []) or []:
+            if w not in warnings:
+                warnings.append(w)
+    except Exception:
+        warnings.append("changelog-collect output was not parseable; categorization skipped")
+else:
+    warnings.append("changelog-collect failed; categorization skipped")
+
+feature_count = int(counts.get("features", 0) or 0)
+other_count = int(counts.get("other", 0) or 0)
+
+# ---- PR label lookup for the `breaking` label --------------------------
+def lookup_labels(n):
+    if gh_mock:
+        path = os.path.join(gh_mock, "pr-view-%s-labels.json" % n)
+        if os.path.exists(path):
+            try:
+                data = json.load(open(path, encoding="utf-8"))
+                return [l.get("name") for l in data.get("labels", []) if l.get("name")]
+            except Exception:
+                return []
+        return []
+    if not shutil.which("gh"):
+        return None
+    r = subprocess.run(["gh", "pr", "view", n, "--json", "labels"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        return []
+    try:
+        return [l.get("name") for l in json.loads(r.stdout).get("labels", []) if l.get("name")]
+    except Exception:
+        return []
+
+
+pr_refs_unique = []
+for c in commits:
+    if c["prRef"] and c["prRef"] not in pr_refs_unique:
+        pr_refs_unique.append(c["prRef"])
+
+label_cache = {}
+labels_unverified = False
+if pr_refs_unique:
+    if not gh_mock and not shutil.which("gh"):
+        labels_unverified = True
+    else:
+        for n in pr_refs_unique:
+            labs = lookup_labels(n)
+            if labs is None:
+                labels_unverified = True
+                break
+            label_cache[n] = labs
+
+# ---- collect signals ---------------------------------------------------
+signals = []          # ordered: major first, then minor, then patch
+major_explicit = False
+major_supersede = False
+new_adrs = []
+
+for c in commits:
+    if BREAKING_RE.search(c["text"]):
+        major_explicit = True
+        signals.append({"signal": "breaking-change", "tier": "major",
+                        "detail": "commit %s carries a BREAKING CHANGE marker" % c["abbrev"]})
+    m = VERB_RE.match(c["subject"])
+    if m and m.group(3) == "!":
+        major_explicit = True
+        signals.append({"signal": "breaking-bang", "tier": "major",
+                        "detail": "commit %s uses a conventional `!` breaking bang" % c["abbrev"]})
+
+for n in pr_refs_unique:
+    if "breaking" in [l.lower() for l in label_cache.get(n, [])]:
+        major_explicit = True
+        signals.append({"signal": "breaking-label", "tier": "major",
+                        "detail": "PR #%s carries a 'breaking' label" % n})
+
+for c in commits:
+    if SUPERSEDE_RE.search(c["text"]):
+        toks = ["ADR-%03d" % int(x) for x in ADR_TOKEN_RE.findall(c["text"])]
+        major_supersede = True
+        detail = "commit %s supersedes an accepted ADR" % c["abbrev"]
+        if toks:
+            detail += " (%s)" % ", ".join(dict.fromkeys(toks))
+        signals.append({"signal": "adr-superseded", "tier": "major", "detail": detail})
+
+for c in commits:
+    if NEW_ADR_RE.search(c["text"]):
+        for x in ADR_TOKEN_RE.findall(c["text"]):
+            tok = "ADR-%03d" % int(x)
+            if tok not in new_adrs:
+                new_adrs.append(tok)
+
+if feature_count > 0:
+    signals.append({"signal": "feature-commits", "tier": "minor",
+                    "detail": "%d feature commit(s) categorized by changelog-collect" % feature_count})
+if new_adrs:
+    signals.append({"signal": "new-adr", "tier": "minor",
+                    "detail": "new ADR(s) introduced: %s" % ", ".join(new_adrs)})
+
+# ---- classify bump + confidence ----------------------------------------
+RANK = {"none": 0, "low": 1, "medium": 2, "high": 3}
+INV = {v: k for k, v in RANK.items()}
+
+
+def cap(conf, ceiling):
+    return INV[min(RANK[conf], RANK[ceiling])]
+
+
+if empty:
+    bump = None
+    confidence = "none"
+    warnings.append("no commits in range — nothing to release")
+elif major_explicit or major_supersede:
+    bump = "major"
+    confidence = "high" if major_explicit else "medium"
+elif feature_count > 0 or new_adrs:
+    bump = "minor"
+    confidence = "high" if feature_count > 0 else "medium"
+else:
+    bump = "patch"
+    confidence = "high" if other_count == 0 else "medium"
+    if other_count > 0:
+        warnings.append("%d unconventional commit(s) could not be categorized; "
+                        "review manually before settling on patch" % other_count)
+
+if not empty:
+    # Add the patch-only rationale signal so the basis is always explicit.
+    if bump == "patch":
+        signals.append({"signal": "patch-only", "tier": "patch",
+                        "detail": "only fix/docs/chore/refactor commits; no feature or breaking signal"})
+    # If a `breaking` label could not be verified, the major tier may be
+    # under-counted — cap confidence and say so.
+    if labels_unverified:
+        confidence = cap(confidence, "medium")
+        warnings.append("gh unavailable; could not verify PR labels (a 'breaking' "
+                        "label may be missed)")
+
+outputs = {
+    "range": {"from": rng_from, "to": rng_to, "empty": empty},
+    "suggestedBump": bump,
+    "confidence": confidence,
+    "signals": signals,
+    "warnings": warnings,
+}
+
+if empty:
+    text = "release-suggest: no commits in %s..%s — nothing to release" % (rng_from, rng_to)
+else:
+    text = "release-suggest: suggest %s (confidence %s) from %d signal(s)" % (
+        bump, confidence, len(signals))
+    if warnings:
+        text += " [%s]" % "; ".join(warnings)
+
+print(json.dumps({"exit": 0, "status": "ok" if not empty else "empty",
+                  "outputs": outputs, "text": text, "errors": []}, ensure_ascii=False))
+PYEOF
+)
+
+EXIT_HINT=$(printf '%s' "$RESULT" | jq -r '.exit')
+STATUS=$(printf '%s' "$RESULT" | jq -r '.status')
+OUTPUTS=$(printf '%s' "$RESULT" | jq -c '.outputs')
+ERRORS=$(printf '%s' "$RESULT" | jq -c '.errors')
+
+if [ "$FORMAT" = "json" ]; then
+  print_envelope "release-suggest" "$STATUS" "$OUTPUTS" "[]" "$ERRORS"
+else
+  printf '%s\n' "$(printf '%s' "$RESULT" | jq -r '.text')"
+fi
+
+case "$EXIT_HINT" in
+  0) exit "$ENVELOPE_EXIT_OK" ;;
+  *) exit "$ENVELOPE_EXIT_INVOCATION" ;;
+esac
