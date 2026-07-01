@@ -10,6 +10,7 @@ import (
 	"github.com/olivermorgan2/llm-wiki-kit/internal/contract"
 	"github.com/olivermorgan2/llm-wiki-kit/internal/platform"
 	"github.com/olivermorgan2/llm-wiki-kit/internal/validate"
+	"github.com/olivermorgan2/llm-wiki-kit/internal/yamladapter"
 )
 
 // version is the llm-wiki build version. It is a skeleton placeholder until the
@@ -23,7 +24,10 @@ Usage:
 
 Commands:
   version     Print the engine version.
-  validate    Validate repository contents (no rules implemented yet).
+  validate    Validate a wiki against the OKF base and core profile. Reports
+              OKF and profile findings separately at three severities
+              (error/warning/suggestion). Takes an optional target directory
+              (default: the current directory).
   selfcheck   Verify this platform's shipped binary against its bundled
               checksum (ADR-002). Use --root <dir> to point at the bundle;
               defaults to the directory containing the running executable.
@@ -92,15 +96,32 @@ func runVersion(stdout io.Writer, jsonMode bool) int {
 	return int(contract.ExitSuccess)
 }
 
-func runValidate(paths []string, stdout io.Writer, jsonMode bool) int {
-	findings := validate.New(nil).Run(paths)
-	env := contract.New("validate", contract.StatusSuccess)
+// runValidate walks a target directory (default ".") and reports OKF and
+// core-profile findings through the contract envelope. It applies the ADR-004
+// precedence in fixed order: engine core defaults → Resolve (no profile
+// overrides ship in this issue) → status. The default CLI path runs release-gate
+// semantics and loads no adoption baseline, so structural errors always fail the
+// gate (ADR-004).
+func runValidate(args []string, stdout io.Writer, jsonMode bool) int {
+	root := "."
+	if len(args) > 0 {
+		root = args[0]
+	}
+
+	findings := validate.New(yamladapter.New()).Run(os.DirFS(root))
+	findings = validate.Resolve(findings, nil)
+	status := validate.StatusFor(findings)
+
+	env := contract.New("validate", status)
 	env.Findings = findings
 
 	if jsonMode {
 		return emit(stdout, env)
 	}
-	fmt.Fprintf(stdout, "validate: OK — %d finding(s) (no validation rules implemented yet)\n", len(findings))
+	fmt.Fprintf(stdout, "validate: %s — %d finding(s)\n", status, len(findings))
+	for _, f := range findings {
+		fmt.Fprintf(stdout, "  [%s/%s] %s: %s (%s)\n", f.Ruleset, f.Severity, f.Code, f.Message, f.Path)
+	}
 	return int(contract.ExitCodeForStatus(env.Status))
 }
 

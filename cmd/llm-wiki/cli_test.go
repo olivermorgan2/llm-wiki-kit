@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -76,26 +78,85 @@ func TestVersionJSONEmitsSuccessEnvelope(t *testing.T) {
 	}
 }
 
-func TestValidateJSONEmitsSuccessEnvelope(t *testing.T) {
-	stdout, _, code := exec(t, "validate", "--json")
+// writeFixtureDir creates a temp directory holding the given filename→content
+// pages and returns its path, so validate can run over a controlled wiki.
+func writeFixtureDir(t *testing.T, pages map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for name, body := range pages {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatalf("write fixture %s: %v", name, err)
+		}
+	}
+	return dir
+}
+
+const validFixturePage = "---\ntype: concept\ntitle: Alpha\ndescription: A page.\ntimestamp: 2026-01-01\ntags: [x]\naliases: [y]\nresource: r\n---\n# Alpha\n"
+
+// A complete, conformant page validates clean: success, exit 0, no findings.
+func TestValidateJSONCleanPageIsSuccess(t *testing.T) {
+	dir := writeFixtureDir(t, map[string]string{"alpha-page.md": validFixturePage})
+	stdout, _, code := exec(t, "validate", dir, "--json")
 
 	env := decodeEnvelope(t, stdout)
 	if env.Operation != "validate" {
 		t.Errorf("operation = %q, want validate", env.Operation)
 	}
 	if env.Status != contract.StatusSuccess {
-		t.Errorf("status = %q, want success (no-op skeleton)", env.Status)
+		t.Errorf("status = %q, want success", env.Status)
 	}
 	if env.Findings == nil || len(env.Findings) != 0 {
-		t.Errorf("no-op validate must report zero findings, got %v", env.Findings)
+		t.Errorf("clean page must report zero findings, got %v", env.Findings)
 	}
 	if code != int(contract.ExitSuccess) {
 		t.Errorf("exit code = %d, want %d", code, int(contract.ExitSuccess))
 	}
 }
 
+// Malformed YAML fails validation unconditionally: validation-failure, exit 2,
+// tagged as the OKF parse error (criterion 7).
+func TestValidateJSONMalformedYAMLIsValidationFailure(t *testing.T) {
+	dir := writeFixtureDir(t, map[string]string{"bad.md": "---\ntype: concept\ntitle: {broken\n---\n"})
+	stdout, _, code := exec(t, "validate", dir, "--json")
+
+	env := decodeEnvelope(t, stdout)
+	if env.Status != contract.StatusValidationFailure {
+		t.Errorf("status = %q, want validation-failure", env.Status)
+	}
+	if code != int(contract.ExitValidationFailure) {
+		t.Errorf("exit code = %d, want %d", code, int(contract.ExitValidationFailure))
+	}
+	var sawParse bool
+	for _, f := range env.Findings {
+		if f.Ruleset == contract.RulesetOKF && f.Code == "okf-yaml-parse" {
+			sawParse = true
+		}
+	}
+	if !sawParse {
+		t.Errorf("expected an OKF okf-yaml-parse finding, got %+v", env.Findings)
+	}
+}
+
+// A page whose only issue is a non-kebab filename is a warning: the run reports
+// success-with-warnings and exit 1 (warnings do not fail the gate).
+func TestValidateJSONWarningOnlyIsSuccessWithWarnings(t *testing.T) {
+	// Complete frontmatter (no errors, no missing recommended fields) but a
+	// non-kebab filename → a single warning.
+	dir := writeFixtureDir(t, map[string]string{"Not_Kebab.md": validFixturePage})
+	stdout, _, code := exec(t, "validate", dir, "--json")
+
+	env := decodeEnvelope(t, stdout)
+	if env.Status != contract.StatusSuccessWithWarnings {
+		t.Fatalf("status = %q, want success-with-warnings (%+v)", env.Status, env.Findings)
+	}
+	if code != int(contract.ExitSuccessWithWarnings) {
+		t.Errorf("exit code = %d, want %d", code, int(contract.ExitSuccessWithWarnings))
+	}
+}
+
 func TestValidateIsHumanReadableByDefault(t *testing.T) {
-	stdout, _, code := exec(t, "validate")
+	dir := writeFixtureDir(t, map[string]string{"alpha-page.md": validFixturePage})
+	stdout, _, code := exec(t, "validate", dir)
 
 	if strings.Contains(stdout, "{") {
 		t.Errorf("default output must be human-readable, not JSON: %s", stdout)
