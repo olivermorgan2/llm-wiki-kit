@@ -19,6 +19,7 @@ const (
 	codeCoreFieldType   = "core-field-type"
 	codeCoreRecommended = "core-recommended-missing"
 	codeCoreKebab       = "core-kebab-filename"
+	codeCoreBrokenLink  = "core-broken-link"
 )
 
 // evaluatePage runs the OKF and core-profile rules over one page and returns
