@@ -6,6 +6,10 @@ import (
 	"io/fs"
 )
 
+// ManifestName is the checksum file that ships in bin/ alongside the per-
+// platform binaries. Its bundle-relative location is "bin/" + ManifestName.
+const ManifestName = "SHA256SUMS"
+
 // The three integrity-failure modes ADR-002 requires the gate to catch. All of
 // them are terminal: the caller must refuse to execute the selected binary.
 var (
@@ -48,4 +52,26 @@ func Verify(fsys fs.FS, p Platform, m Manifest) error {
 		return fmt.Errorf("%w: %s: have %s, want %s", ErrChecksumMismatch, path, got, want)
 	}
 	return nil
+}
+
+// VerifyBundle is the single call a launcher or the selfcheck command makes: it
+// detects the running platform, loads bin/SHA256SUMS from fsys, and verifies
+// this platform's artifact against it. On success it returns the verified
+// Platform. Like Verify it fails closed and performs no network access.
+func VerifyBundle(fsys fs.FS) (Platform, error) {
+	p, err := Detect()
+	if err != nil {
+		return p, err
+	}
+	name := "bin/" + ManifestName
+	f, err := fsys.Open(name)
+	if err != nil {
+		return p, fmt.Errorf("open manifest %s: %w", name, err)
+	}
+	defer f.Close()
+	m, err := ParseManifest(f)
+	if err != nil {
+		return p, fmt.Errorf("parse manifest %s: %w", name, err)
+	}
+	return p, Verify(fsys, p, m)
 }
