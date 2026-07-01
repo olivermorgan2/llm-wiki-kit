@@ -53,6 +53,27 @@ func TestResolveDemotesSeverity(t *testing.T) {
 	}
 }
 
+// A broken-link finding defaults to warning (success-with-warnings, exit 1); a
+// profile override promoting core-broken-link to error flips the run to
+// validation-failure (exit 2). This exercises the ADR-004 core-default → profile-
+// override precedence for issue #4 with no new engine code. (AC #2)
+func TestBrokenLinkPromotionFlipsStatus(t *testing.T) {
+	findings := []contract.Finding{
+		{Ruleset: contract.RulesetProfile, Severity: contract.SeverityWarning, Code: codeCoreBrokenLink, Path: "a.md"},
+	}
+
+	// Default (no overrides): warning → success-with-warnings.
+	if got := StatusFor(Resolve(findings, nil)); got != contract.StatusSuccessWithWarnings {
+		t.Errorf("default status = %q, want success-with-warnings", got)
+	}
+
+	// Promoted to error: validation-failure.
+	promoted := Resolve(findings, map[string]contract.Severity{codeCoreBrokenLink: contract.SeverityError})
+	if got := StatusFor(promoted); got != contract.StatusValidationFailure {
+		t.Errorf("promoted status = %q, want validation-failure", got)
+	}
+}
+
 // Overrides change severity only; they never add or remove findings.
 func TestResolveNeverChangesCount(t *testing.T) {
 	got := Resolve(sampleFindings(), map[string]contract.Severity{
