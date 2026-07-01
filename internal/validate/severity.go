@@ -23,3 +23,24 @@ func Resolve(findings []contract.Finding, overrides map[string]contract.Severity
 	}
 	return out
 }
+
+// StatusFor reduces the effective (post-resolve, post-baseline) findings to an
+// envelope status per ADR-004: any remaining error → validation-failure; else
+// any warning → success-with-warnings; else (clean, or suggestions only) →
+// success. Suggestions are advisory and never affect the outcome. The status
+// maps to a process exit code via contract.ExitCodeForStatus.
+func StatusFor(findings []contract.Finding) contract.Status {
+	sawWarning := false
+	for _, f := range findings {
+		switch f.Severity {
+		case contract.SeverityError:
+			return contract.StatusValidationFailure
+		case contract.SeverityWarning:
+			sawWarning = true
+		}
+	}
+	if sawWarning {
+		return contract.StatusSuccessWithWarnings
+	}
+	return contract.StatusSuccess
+}
