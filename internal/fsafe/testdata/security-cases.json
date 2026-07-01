@@ -1,0 +1,46 @@
+{
+  "traversal": [
+    {
+      "name": "parent-relative",
+      "input": "../outside.txt",
+      "expect": "ErrOutsideBoundary",
+      "criterion": 17
+    },
+    {
+      "name": "nested-then-escape",
+      "input": "a/../../x.txt",
+      "expect": "ErrOutsideBoundary",
+      "criterion": 17
+    },
+    {
+      "name": "deep-etc-passwd",
+      "input": "../../etc/passwd",
+      "expect": "ErrOutsideBoundary",
+      "criterion": 17
+    },
+    {
+      "name": "absolute-outside-root",
+      "input": "{{OUTSIDE}}/loot.txt",
+      "expect": "ErrOutsideBoundary",
+      "criterion": 17
+    }
+  ],
+  "symlink": [
+    {
+      "name": "dir-symlink-escape",
+      "link": "link",
+      "target": "{{OUTSIDE}}",
+      "input": "link/loot.txt",
+      "expect": "ErrSymlinkEscape",
+      "criterion": 17
+    },
+    {
+      "name": "nested-symlink-escape",
+      "link": "sub/escape",
+      "target": "{{OUTSIDE}}",
+      "input": "sub/escape/file.txt",
+      "expect": "ErrSymlinkEscape",
+      "criterion": 17
+    }
+  ]
+}
