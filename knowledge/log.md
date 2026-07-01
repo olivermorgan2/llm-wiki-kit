@@ -246,6 +246,29 @@ ADR-C1–C4 pass; ADR-C5 expected forward-ref warnings for ADR-006/008/009/010).
 No `{{`/`}}`/`_TBD_` placeholders introduced; all five statuses remain
 `proposed`. **Gate status:** ready to **rerun the Codex ADR review gate**.
 
+### 2026-07-01 — Codex ADR-001–005 re-review — verdict `READY`
+
+Reran the adversarial Codex milestone/ADR gate after revision commit `dda3687`.
+The verbatim re-review artifact is archived at
+[`reviews/2026-07-01-codex-adr-001-005-rereview.md`](reviews/2026-07-01-codex-adr-001-005-rereview.md).
+
+Codex marked all four prior blockers **resolved**:
+
+1. ADR-001 now separates binding unknown-frontmatter preservation from
+   best-effort, non-gated comment preservation.
+2. ADR-002 now states checksum verification is an integrity/corruption check,
+   not an authenticity check, and records residual signing/provenance risk.
+3. ADR-005 now guarantees per-file atomicity only and defers cross-file
+   transaction semantics to ADR-006.
+4. ADR-004 now bounds baseline suppression against malformed YAML, CI/release
+   gates, required-field errors, and exit-code behavior.
+
+**Gate status:** Codex says **`READY`** for human acceptance. ADR-001–005 still
+remain **`proposed`** until Oliver explicitly accepts them. Q2/Q7/Q8 remain
+**open** until that acceptance step; after acceptance, flip ADR statuses to
+`accepted`, close Q2/Q7/Q8 with this log back-reference, and prepare dependent
+Phase 1 implementation issues.
+
 ### 2026-06-30 — Knowledge layer reconciled to canonical file set
 
 Aligned `knowledge/` with the project's explicit layer spec: added

@@ -5,19 +5,19 @@ Front door to the `llm-wiki-kit` knowledge layer. Conventions live in
 
 ## Current phase
 
-**ADR-001–005 (`proposed`) — Codex `NEEDS_REVISION` findings applied; awaiting
-re-review.** Bootstrapped 2026-06-30 from `claude-workflow-kit` v5.0.1.
-Source PRD normalized; adversarial Codex review (`NEEDS_REVISION`) landed as PRD
-addenda 001–005; `/prd-to-mvp` produced [`design/mvp.md`](../design/mvp.md) and
+**ADR-001–005 revised and Codex re-review returned `READY` — pending human
+acceptance.** Bootstrapped 2026-06-30 from `claude-workflow-kit` v5.0.1. Source
+PRD normalized; adversarial Codex review (`NEEDS_REVISION`) landed as PRD addenda
+001–005; `/prd-to-mvp` produced [`design/mvp.md`](../design/mvp.md) and
 [`design/build-out-plan.md`](../design/build-out-plan.md) (7 phases / Slices
 0–6 + cross-platform gate, all 21 acceptance criteria mapped). The five Phase-1
 prerequisite ADRs ([`design/adr/`](../design/adr/) 001–005: toolchain, binary
-selection, JSON contract, validation model, safe-FS gate) are `proposed` and
-self-validated; the 2026-07-01 Codex gate's four blocking revision targets have
-now been **applied** (see the 2026-07-01 revision entry in [`log.md`](log.md)).
-Acceptance remains a human act after the Codex **re-review** returns `READY`. See
-[`log.md`](log.md) and
-[`reviews/2026-07-01-codex-adr-001-005-review.md`](reviews/2026-07-01-codex-adr-001-005-review.md).
+selection, JSON contract, validation model, safe-FS gate) are drafted as
+`proposed`, revised against the 2026-07-01 Codex blockers, self-validated, and
+second Codex-gated as `READY`. Acceptance remains a human act. See
+[`log.md`](log.md),
+[`reviews/2026-07-01-codex-adr-001-005-review.md`](reviews/2026-07-01-codex-adr-001-005-review.md), and
+[`reviews/2026-07-01-codex-adr-001-005-rereview.md`](reviews/2026-07-01-codex-adr-001-005-rereview.md).
 
 ## Knowledge layer
 
@@ -28,7 +28,7 @@ Acceptance remains a human act after the Codex **re-review** returns `READY`. Se
 | [`risks.md`](risks.md) | Live risk register (product, cross-cutting, process, review). |
 | [`open-questions.md`](open-questions.md) | Q1–Q8 + bootstrap questions, with status. |
 | [`log.md`](log.md) | Chronological decision & review log. |
-| [`reviews/`](reviews/) | Verbatim review archives — [`2026-06-30-codex-prd-review.md`](reviews/2026-06-30-codex-prd-review.md), [`2026-07-01-codex-adr-001-005-review.md`](reviews/2026-07-01-codex-adr-001-005-review.md). |
+| [`reviews/`](reviews/) | Verbatim review archives — [`2026-06-30-codex-prd-review.md`](reviews/2026-06-30-codex-prd-review.md), [`2026-07-01-codex-adr-001-005-review.md`](reviews/2026-07-01-codex-adr-001-005-review.md), [`2026-07-01-codex-adr-001-005-rereview.md`](reviews/2026-07-01-codex-adr-001-005-rereview.md). |
 | [`sources/`](sources/) | Verbatim sources — [`prd-original.md`](sources/prd-original.md). |
 
 ## Pointers into `design/` (authoritative, tool-maintained)
@@ -44,14 +44,13 @@ Acceptance remains a human act after the Codex **re-review** returns `READY`. Se
 
 ## Next action
 
-**Rerun the Codex ADR/milestone review gate** over the revised ADR-001–005. The
-bounded revision pass is complete (2026-07-01): ADR-001 comment-preservation
-traceability, ADR-002 checksum trust root / residual supply-chain risk, ADR-005
-per-file vs cross-file atomicity (transaction model deferred to ADR-006), and
-ADR-004 baseline vs hard-validation errors are all addressed, plus ADR-003
-`--json`/exit-code refinements. Do **not** flip the five ADRs to `accepted`, and
-do not close Q2/Q7/Q8, until the re-review returns `READY` and Oliver accepts. ADR-006–012 remain to be
-drafted from the "Decisions needing ADRs" list at the end of
+**Human acceptance decision** for ADR-001–005. The revision pass is complete and
+Codex re-review returned `READY` (2026-07-01). If Oliver accepts: flip each ADR
+status to `accepted`, update [`open-questions.md`](open-questions.md) Q2/Q7/Q8 to
+`closed` with a [`log.md`](log.md) back-reference, then prepare dependent Phase 1
+implementation issues. Keep ADR-003 numeric exit-code values and ADR-006
+transaction ownership explicit in the first implementation/spec issue. ADR-006–012
+remain to be drafted from the "Decisions needing ADRs" list at the end of
 [`design/build-out-plan.md`](../design/build-out-plan.md). Owner decisions that
 could revise MVP scope remain tracked as assumption-locked items in
 [`open-questions.md`](open-questions.md) — notably the working-name lock (QB1).
