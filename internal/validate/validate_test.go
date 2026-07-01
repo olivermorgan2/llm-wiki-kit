@@ -72,6 +72,34 @@ func TestRunWalksDeterministicallyAndFiltersMarkdown(t *testing.T) {
 	}
 }
 
+// A broken intra-wiki link surfaces through Run at its page, resolved against
+// the bundle path-set collected during the walk; a page whose links all resolve
+// raises none. (issue #4)
+func TestRunReportsBrokenIntraWikiLink(t *testing.T) {
+	fsys := fstest.MapFS{
+		"concepts/alpha.md": page(validPage + "\nSee [real](claims/real.md) and [gone](claims/missing.md).\n"),
+		"claims/real.md":    page(validPage),
+	}
+	got := engine().Run(fsys)
+	broken := findingsWithCode(got, codeCoreBrokenLink)
+	if len(broken) != 1 {
+		t.Fatalf("want exactly one core-broken-link finding, got %d (%+v)", len(broken), got)
+	}
+	if broken[0].Path != "concepts/alpha.md" {
+		t.Errorf("finding path = %q, want concepts/alpha.md", broken[0].Path)
+	}
+}
+
+func TestRunAllLinksValidNoBrokenLinkFinding(t *testing.T) {
+	fsys := fstest.MapFS{
+		"concepts/alpha.md": page(validPage + "\nSee [real](claims/real.md).\n"),
+		"claims/real.md":    page(validPage),
+	}
+	if got := engine().Run(fsys); len(findingsWithCode(got, codeCoreBrokenLink)) != 0 {
+		t.Errorf("all-valid links should yield no broken-link finding, got %+v", got)
+	}
+}
+
 // End-to-end through the precedence layers: a malformed page exits validation-
 // failure; the parse error survives baseline in release-gate mode.
 func TestRunThroughPrecedenceMalformedIsValidationFailure(t *testing.T) {

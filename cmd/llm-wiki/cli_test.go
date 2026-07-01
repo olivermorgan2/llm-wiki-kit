@@ -93,6 +93,10 @@ func writeFixtureDir(t *testing.T, pages map[string]string) string {
 
 const validFixturePage = "---\ntype: concept\ntitle: Alpha\ndescription: A page.\ntimestamp: 2026-01-01\ntags: [x]\naliases: [y]\nresource: r\n---\n# Alpha\n"
 
+// brokenLinkFixturePage is complete and kebab-named, so its only finding is a
+// single core-broken-link (an intra-wiki link to a page absent from the bundle).
+const brokenLinkFixturePage = "---\ntype: concept\ntitle: Alpha\ndescription: A page.\ntimestamp: 2026-01-01\ntags: [x]\naliases: [y]\nresource: r\n---\n# Alpha\nSee [gone](missing-target.md).\n"
+
 // A complete, conformant page validates clean: success, exit 0, no findings.
 func TestValidateJSONCleanPageIsSuccess(t *testing.T) {
 	dir := writeFixtureDir(t, map[string]string{"alpha-page.md": validFixturePage})
@@ -154,6 +158,52 @@ func TestValidateJSONWarningOnlyIsSuccessWithWarnings(t *testing.T) {
 	}
 }
 
+// A page whose only issue is a broken intra-wiki link is, by default, a warning:
+// success-with-warnings, exit 1 (ADR-004 FR8 default severity).
+func TestValidateBrokenLinkDefaultIsWarning(t *testing.T) {
+	dir := writeFixtureDir(t, map[string]string{"alpha-page.md": brokenLinkFixturePage})
+	stdout, _, code := exec(t, "validate", dir, "--json")
+
+	env := decodeEnvelope(t, stdout)
+	if env.Status != contract.StatusSuccessWithWarnings {
+		t.Fatalf("status = %q, want success-with-warnings (%+v)", env.Status, env.Findings)
+	}
+	if code != int(contract.ExitSuccessWithWarnings) {
+		t.Errorf("exit code = %d, want %d", code, int(contract.ExitSuccessWithWarnings))
+	}
+}
+
+// Configuring core-broken-link at error severity (LLM_WIKI_SEVERITY) promotes the
+// warning to a validation failure end-to-end: the emitted envelope flips to
+// validation-failure and the process exits 2. This is the runtime override path
+// the engine-level Resolve unit test could not exercise (ADR-004 core-default →
+// profile-override precedence, #4).
+func TestValidateBrokenLinkPromotedToErrorViaConfig(t *testing.T) {
+	t.Setenv("LLM_WIKI_SEVERITY", "core-broken-link=error")
+	dir := writeFixtureDir(t, map[string]string{"alpha-page.md": brokenLinkFixturePage})
+	stdout, _, code := exec(t, "validate", dir, "--json")
+
+	env := decodeEnvelope(t, stdout)
+	if env.Status != contract.StatusValidationFailure {
+		t.Fatalf("status = %q, want validation-failure (%+v)", env.Status, env.Findings)
+	}
+	if code != int(contract.ExitValidationFailure) {
+		t.Errorf("exit code = %d, want %d", code, int(contract.ExitValidationFailure))
+	}
+	var saw bool
+	for _, f := range env.Findings {
+		if f.Code == "core-broken-link" {
+			saw = true
+			if f.Severity != contract.SeverityError {
+				t.Errorf("core-broken-link severity = %q, want error (promoted)", f.Severity)
+			}
+		}
+	}
+	if !saw {
+		t.Errorf("expected a core-broken-link finding, got %+v", env.Findings)
+	}
+}
+
 func TestValidateIsHumanReadableByDefault(t *testing.T) {
 	dir := writeFixtureDir(t, map[string]string{"alpha-page.md": validFixturePage})
 	stdout, _, code := exec(t, "validate", dir)
@@ -192,6 +242,33 @@ func TestJSONFlagPositionIndependent(t *testing.T) {
 	}
 	if before != after {
 		t.Errorf("--json position changed output:\n before: %s\n after: %s", before, after)
+	}
+}
+
+// severityOverrides parses configured code=severity pairs into a Resolve map.
+func TestSeverityOverridesParsesConfiguredPairs(t *testing.T) {
+	got := severityOverrides("core-broken-link=error, core-kebab-filename=warning")
+	if got["core-broken-link"] != contract.SeverityError {
+		t.Errorf("core-broken-link = %q, want error", got["core-broken-link"])
+	}
+	if got["core-kebab-filename"] != contract.SeverityWarning {
+		t.Errorf("core-kebab-filename = %q, want warning", got["core-kebab-filename"])
+	}
+}
+
+// An empty config yields nil, the identity Resolve treats as a core-only run.
+func TestSeverityOverridesEmptyIsNil(t *testing.T) {
+	if got := severityOverrides(""); got != nil {
+		t.Errorf("empty config should yield nil overrides, got %v", got)
+	}
+}
+
+// A pair whose severity is not one of the three levels is ignored rather than
+// crashing or silently coercing.
+func TestSeverityOverridesIgnoresInvalidSeverity(t *testing.T) {
+	got := severityOverrides("core-broken-link=bogus")
+	if _, ok := got["core-broken-link"]; ok {
+		t.Errorf("invalid severity value must be ignored, got %v", got)
 	}
 }
 
