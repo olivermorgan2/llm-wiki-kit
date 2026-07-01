@@ -1,6 +1,6 @@
 # ADR-004: Separate OKF/profile reporting with a three-severity validation model
 
-**Status:** proposed
+**Status:** accepted
 **Date:** 2026-06-30
 
 ## Context

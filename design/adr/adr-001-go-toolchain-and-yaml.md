@@ -1,6 +1,6 @@
 # ADR-001: Adopt Go 1.24.x and goccy/go-yaml for the engine toolchain
 
-**Status:** proposed
+**Status:** accepted
 **Date:** 2026-06-30
 
 ## Context

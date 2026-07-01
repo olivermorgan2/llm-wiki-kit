@@ -269,6 +269,56 @@ remain **`proposed`** until Oliver explicitly accepts them. Q2/Q7/Q8 remain
 `accepted`, close Q2/Q7/Q8 with this log back-reference, and prepare dependent
 Phase 1 implementation issues.
 
+### 2026-07-01 — ADR-001–005 accepted by Oliver; Q2/Q7/Q8 closed
+
+Oliver reviewed the Codex `READY` re-review and **accepted ADR-001 through
+ADR-005**. Applied the acceptance bookkeeping (documentation/decision only — no
+product/source code):
+
+- **ADR status flips:** all five ADR bodies moved `proposed` → **`accepted`**;
+  `sync-adr-index` regenerated the 5-row table in
+  [`../design/adr/README.md`](../design/adr/README.md) to match. ADR `**Date:**`
+  lines left at their authoring date (2026-06-30); acceptance date is recorded
+  here (2026-07-01).
+- **Open questions closed** ([`open-questions.md`](open-questions.md)):
+  - **Q2** (Go version + YAML library) → **closed** by accepted ADR-001
+    (Go 1.24.x + `goccy/go-yaml`).
+  - **Q7** (platform-binary selection) → **closed for the ship/select/verify
+    scope only** by accepted ADR-002. Full install/upgrade/uninstall **asset
+    ownership** (criteria 1, 3, 20) and release **signing/provenance** remain
+    **deferred to ADR-009**; residual supply-chain risk stays `open` in
+    [`risks.md`](risks.md).
+  - **Q8** (JSON contract versioning/compat) → **closed** by accepted ADR-003.
+    Carry-forward (not a reopened question): the **exact numeric exit-code
+    values** are still a Phase 1 implementation/spec item and must be published
+    as a stable code→meaning table **before Phase 1 closes**.
+- **Risk register** ([`risks.md`](risks.md)): ADR annotations updated
+  `(proposed)` → `(accepted)`; all bounded risks **stay `open`** per
+  [`SCHEMA.md`](SCHEMA.md) — an accepted ADR bounds a risk but does not retire it
+  before the engineering exists.
+- **Phase 1 planning artifact:** drafted
+  [`../notes/phase-1-first-issue-spec.md`](../notes/phase-1-first-issue-spec.md)
+  — a pre-issue spec for the first Phase 1 implementation issue (deterministic
+  CLI skeleton + JSON-contract spine) enabled by accepted ADR-001/003/004/005.
+  It carries forward: the ADR-003 numeric exit-code table (before Phase 1 close),
+  the ADR-006 draft prerequisite (before any cross-file mutation), and the
+  ADR-002≠ADR-009 installer boundary.
+
+**Preserved deferred boundaries:** ADR-006 (staged mutation / inspect-plan-apply
+transaction semantics), ADR-008 (provenance/audit), ADR-009 (install/upgrade/
+uninstall asset ownership + signing/provenance handoff), ADR-010 (index
+consistency) — none decided by this acceptance.
+
+**Validation:** `check-plan --criteria-set adr --non-interactive` re-run on all
+five (deterministic ADR-C1–C4 pass; ADR-C5 expected forward-ref warnings for
+ADR-006/008/009/010, still undrafted); `sync-adr-index` clean; no
+`{{`/`}}`/`_TBD_` placeholders in the ADRs or the planning artifact.
+
+**Next step:** file the Phase 1 backlog as GitHub issues (`/issue-planner`) and
+`/prepare-issue` the first one from the pre-issue spec — plus draft **ADR-006**
+before any cross-file mutation/transaction work begins. No GitHub issues were
+created in this session; no remote side effects.
+
 ### 2026-06-30 — Knowledge layer reconciled to canonical file set
 
 Aligned `knowledge/` with the project's explicit layer spec: added

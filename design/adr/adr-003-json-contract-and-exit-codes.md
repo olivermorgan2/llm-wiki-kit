@@ -1,6 +1,6 @@
 # ADR-003: Versioned JSON skill–engine contract (v1) and a fixed exit-code set
 
-**Status:** proposed
+**Status:** accepted
 **Date:** 2026-06-30
 
 ## Context

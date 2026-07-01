@@ -1,6 +1,6 @@
 # ADR-002: Ship and select one checksum-verified platform binary
 
-**Status:** proposed
+**Status:** accepted
 **Date:** 2026-06-30
 
 ## Context

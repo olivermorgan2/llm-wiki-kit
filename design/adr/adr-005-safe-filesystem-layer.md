@@ -1,6 +1,6 @@
 # ADR-005: Mandatory engine filesystem-safety gate
 
-**Status:** proposed
+**Status:** accepted
 **Date:** 2026-06-30
 
 ## Context
