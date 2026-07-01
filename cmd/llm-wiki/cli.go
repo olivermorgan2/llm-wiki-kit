@@ -27,7 +27,9 @@ Commands:
   validate    Validate a wiki against the OKF base and core profile. Reports
               OKF and profile findings separately at three severities
               (error/warning/suggestion). Takes an optional target directory
-              (default: the current directory).
+              (default: the current directory). Set LLM_WIKI_SEVERITY to a
+              comma-separated list of code=severity pairs (e.g.
+              core-broken-link=error) to promote/demote a rule's severity.
   selfcheck   Verify this platform's shipped binary against its bundled
               checksum (ADR-002). Use --root <dir> to point at the bundle;
               defaults to the directory containing the running executable.
@@ -87,6 +89,40 @@ func jsonEnabled() bool {
 	}
 }
 
+// severityOverrides parses the LLM_WIKI_SEVERITY configuration into the profile-
+// override map consumed by validate.Resolve (ADR-004's profile-override layer).
+// The value is a comma-separated list of `code=severity` pairs, e.g.
+// `core-broken-link=error`; severity must be one of error/warning/suggestion.
+// Blank entries and pairs with an unrecognized severity are ignored so a stray
+// config value cannot crash validation. An empty or fully-invalid config yields
+// nil — the identity that a core-only run passes to Resolve. Overrides are keyed
+// by rule code; Resolve ignores any code no finding carries.
+func severityOverrides(config string) map[string]contract.Severity {
+	overrides := map[string]contract.Severity{}
+	for _, pair := range strings.Split(config, ",") {
+		code, sev, ok := strings.Cut(pair, "=")
+		if !ok {
+			continue
+		}
+		code = strings.TrimSpace(code)
+		if code == "" {
+			continue
+		}
+		switch contract.Severity(strings.TrimSpace(sev)) {
+		case contract.SeverityError:
+			overrides[code] = contract.SeverityError
+		case contract.SeverityWarning:
+			overrides[code] = contract.SeverityWarning
+		case contract.SeveritySuggestion:
+			overrides[code] = contract.SeveritySuggestion
+		}
+	}
+	if len(overrides) == 0 {
+		return nil
+	}
+	return overrides
+}
+
 func runVersion(stdout io.Writer, jsonMode bool) int {
 	env := contract.New("version", contract.StatusSuccess)
 	if jsonMode {
@@ -98,10 +134,11 @@ func runVersion(stdout io.Writer, jsonMode bool) int {
 
 // runValidate walks a target directory (default ".") and reports OKF and
 // core-profile findings through the contract envelope. It applies the ADR-004
-// precedence in fixed order: engine core defaults → Resolve (no profile
-// overrides ship in this issue) → status. The default CLI path runs release-gate
-// semantics and loads no adoption baseline, so structural errors always fail the
-// gate (ADR-004).
+// precedence in fixed order: engine core defaults → Resolve (configured profile
+// overrides) → status. Configured severity overrides come from LLM_WIKI_SEVERITY;
+// with none set the run keeps core-default severities. The default CLI path runs
+// release-gate semantics and loads no adoption baseline, so structural errors
+// always fail the gate (ADR-004).
 func runValidate(args []string, stdout io.Writer, jsonMode bool) int {
 	root := "."
 	if len(args) > 0 {
@@ -109,7 +146,7 @@ func runValidate(args []string, stdout io.Writer, jsonMode bool) int {
 	}
 
 	findings := validate.New(yamladapter.New()).Run(os.DirFS(root))
-	findings = validate.Resolve(findings, nil)
+	findings = validate.Resolve(findings, severityOverrides(os.Getenv("LLM_WIKI_SEVERITY")))
 	status := validate.StatusFor(findings)
 
 	env := contract.New("validate", status)

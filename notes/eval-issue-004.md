@@ -108,19 +108,34 @@ unit tests are untouched. Documented here rather than silently substituted.
 - **No filesystem-safety enforcement** (ADR-005 / #5) — root-escaping `../` targets
   merely count as unresolved; the filesystem is never touched for them.
 - **No example/fixture tree** (#6) — in-memory `fstest.MapFS` / inline bytes only.
-- **No new contract surface / profile-loader wiring** — reused `Finding`,
+- **No new contract surface / broad profile-loader** — reused `Finding`,
   `Ruleset`, `Severity`, `Resolve`, `StatusFor`, `ApplyBaseline`, exit mapping.
-  `cmd/llm-wiki/cli.go` still calls `Resolve(findings, nil)` (no profile loader
-  yet), so the CLI surfaces broken links at warning/exit 1 today; the promotion-to-
-  error path is demonstrated at the engine seam where that machinery lives.
+  The runtime override is a minimal configuration seam, not a profile-file loader
+  (ADR-007 remains deferred): `cmd/llm-wiki/cli.go` reads `LLM_WIKI_SEVERITY`
+  (comma-separated `code=severity` pairs) into the `Resolve` override map, mirroring
+  the existing `LLM_WIKI_JSON` env toggle.
+
+## Codex review follow-up — end-to-end configured-severity path
+
+The initial cut demonstrated broken-link promotion only at the engine seam
+(`Resolve(findings, {core-broken-link: error})` in a unit test); the CLI still
+called `Resolve(findings, nil)`, so no runtime path proved a configured override
+flips the emitted envelope/exit code. Fixed by wiring `LLM_WIKI_SEVERITY` into
+`runValidate` and adding CLI-level tests:
+`TestValidateBrokenLinkDefaultIsWarning` (default → warning / exit 1),
+`TestValidateBrokenLinkPromotedToErrorViaConfig` (`core-broken-link=error` →
+validation-failure / exit 2, severity `error` on the envelope finding), plus
+`severityOverrides` parser tests. Scope unchanged: no profile-file loader, no
+network/liveness, no link graph, no fs-safety, no fixture tree.
 
 ## Follow-ups (out of scope for #4)
 
 - **Reference-style links** `[text][ref]`, **autolinks** `<…>`, **raw HTML**
   `<a href>`, and inline-link **titles** `[t](u "title")` are not extracted yet.
 - **Anchor/fragment validation** — `#fragment` is stripped, not checked.
-- **CLI profile-override wiring** — feeding a real profile-supplied override map
-  into `runValidate` belongs with profile-file loading (ADR-007), not this issue.
+- **Profile-file loading** — feeding overrides from a real on-disk profile file
+  belongs with the profile loader (ADR-007), not this issue. The `LLM_WIKI_SEVERITY`
+  env seam proves the configured-severity contract without that loader.
 - `design/architecture.md` still does not exist; for the next `/workflow-docs` run
   note the new `internal/validate` intra-wiki broken-link rule.
 
