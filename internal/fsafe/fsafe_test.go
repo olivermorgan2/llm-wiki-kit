@@ -314,3 +314,140 @@ func TestWriteFileRefusesSymlinkEscapeTarget(t *testing.T) {
 		t.Fatalf("escape target was written: stat err = %v", statErr)
 	}
 }
+
+// --- WriteFile: staging symlink escapes write zero bytes outside (finding 1) ---
+
+// countTree returns the number of regular files anywhere under dir. Used to
+// assert that a poisoned staging symlink caused zero payload bytes to land
+// outside the boundary.
+func countTree(t *testing.T, dir string) int {
+	t.Helper()
+	n := 0
+	err := filepath.Walk(dir, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.Mode().IsRegular() {
+			n++
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Walk(%q): %v", dir, err)
+	}
+	return n
+}
+
+// TestWriteFileRejectsStagingDirSymlink covers finding 1: a pre-planted
+// .llm-wiki symlink pointing outside the boundary must not let the temp write
+// (payload bytes) escape. os.MkdirAll/os.CreateTemp would follow it; the
+// real-directory-chain guard refuses it before any bytes are written.
+func TestWriteFileRejectsStagingDirSymlink(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+
+	// root/.llm-wiki -> outside, created before the gate ever runs.
+	if err := os.Symlink(outside, filepath.Join(root, StagingDir)); err != nil {
+		t.Fatalf("Symlink staging dir: %v", err)
+	}
+	g := newGate(t, root)
+
+	err := g.WriteFile("a.txt", []byte("payload"), 0o600)
+	if !errors.Is(err, ErrSymlinkEscape) {
+		t.Fatalf("WriteFile with symlinked staging err = %v, want ErrSymlinkEscape", err)
+	}
+	if n := countTree(t, outside); n != 0 {
+		t.Fatalf("payload bytes escaped: %d files written under outside dir, want 0", n)
+	}
+	// The intended destination must also be untouched.
+	if _, statErr := os.Stat(filepath.Join(canonRoot(t, root), "a.txt")); !os.IsNotExist(statErr) {
+		t.Fatalf("destination written despite staging escape: stat err = %v", statErr)
+	}
+}
+
+// TestWriteFileRejectsStagingTmpSymlink covers finding 1 one level deeper: a
+// real .llm-wiki dir but a .llm-wiki/tmp symlink pointing outside. The tmp
+// component must be rejected, again writing zero bytes outside.
+func TestWriteFileRejectsStagingTmpSymlink(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+
+	staging := filepath.Join(root, StagingDir)
+	if err := os.MkdirAll(staging, 0o755); err != nil {
+		t.Fatalf("mkdir staging: %v", err)
+	}
+	// root/.llm-wiki/tmp -> outside
+	if err := os.Symlink(outside, filepath.Join(staging, "tmp")); err != nil {
+		t.Fatalf("Symlink staging tmp: %v", err)
+	}
+	g := newGate(t, root)
+
+	err := g.WriteFile("a.txt", []byte("payload"), 0o600)
+	if !errors.Is(err, ErrSymlinkEscape) {
+		t.Fatalf("WriteFile with symlinked staging tmp err = %v, want ErrSymlinkEscape", err)
+	}
+	if n := countTree(t, outside); n != 0 {
+		t.Fatalf("payload bytes escaped: %d files written under outside dir, want 0", n)
+	}
+}
+
+// --- Destination parent chain guards (finding 2) ---
+
+// TestMkdirRealChainRejectsSymlinkParent exercises the creation-time guard that
+// closes the destination parent escape. A real end-to-end WriteFile cannot
+// reach mkdirRealChain with a symlink parent because Resolve already resolves
+// and rejects any parent symlink that exists at resolution time; the residual
+// gap is a parent that becomes a symlink *after* Resolve (a timing race). This
+// white-box test plants that state directly and asserts mkdirRealChain — the
+// code that runs post-Resolve — refuses to create through it.
+func TestMkdirRealChainRejectsSymlinkParent(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	g := newGate(t, root).(*gate)
+
+	// Simulate a parent component that appeared as a symlink escape after
+	// resolution: root/newdir -> outside.
+	if err := os.Symlink(outside, filepath.Join(g.root, "newdir")); err != nil {
+		t.Fatalf("Symlink parent: %v", err)
+	}
+
+	err := g.mkdirRealChain(filepath.Join(g.root, "newdir", "sub"))
+	if !errors.Is(err, ErrSymlinkEscape) {
+		t.Fatalf("mkdirRealChain through symlink parent err = %v, want ErrSymlinkEscape", err)
+	}
+	// It must not have created anything through the escaping symlink.
+	if _, statErr := os.Stat(filepath.Join(outside, "sub")); !os.IsNotExist(statErr) {
+		t.Fatalf("directory created through symlink escape: stat err = %v", statErr)
+	}
+}
+
+// TestAssertRealDirChainRejectsSymlinkParent exercises the pre-rename
+// revalidation directly: even if the parent chain was a real directory when
+// created, a component swapped to a symlink before commit must be caught so the
+// rename cannot follow it outside the boundary.
+func TestAssertRealDirChainRejectsSymlinkParent(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	g := newGate(t, root).(*gate)
+
+	// Real parent chain first: root/a/b.
+	parent := filepath.Join(g.root, "a", "b")
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		t.Fatalf("mkdir parent chain: %v", err)
+	}
+	if err := g.assertRealDirChain(parent); err != nil {
+		t.Fatalf("assertRealDirChain on real chain: %v", err)
+	}
+
+	// Now swap the top component to a symlink escape (root/a -> outside) and
+	// confirm revalidation rejects it before any rename could commit.
+	if err := os.RemoveAll(filepath.Join(g.root, "a")); err != nil {
+		t.Fatalf("remove real a: %v", err)
+	}
+	if err := os.Symlink(outside, filepath.Join(g.root, "a")); err != nil {
+		t.Fatalf("Symlink a: %v", err)
+	}
+	if err := g.assertRealDirChain(parent); !errors.Is(err, ErrSymlinkEscape) {
+		t.Fatalf("assertRealDirChain after symlink swap err = %v, want ErrSymlinkEscape", err)
+	}
+}
