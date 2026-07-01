@@ -209,6 +209,43 @@ The verbatim review artifact is archived at
 Next step is a bounded Claude Code revision pass, then a second Codex ADR review
 before human acceptance / closing Q2/Q7/Q8.
 
+### 2026-07-01 — ADR-001–005 revised per Codex review (still `proposed`)
+
+Applied the bounded revision pass addressing all four blocking findings plus the
+cheap non-blocking refinements. No ADR status flipped — all five stay
+**`proposed`**; Q2/Q7/Q8 stay **open** (assumption-locked); ADR boundaries to
+ADR-006/008/009/010 preserved.
+
+- **ADR-001 (blocking 1):** distinguished the **binding** criterion 6 (unknown
+  frontmatter fields survive) from **best-effort, non-gated** comment
+  preservation across Context, Options, Decision, and Consequences. Repeated the
+  same distinction in [`build-out-plan.md`](../design/build-out-plan.md) §Phase-1
+  toolchain and §Risk-2, and in the [`risks.md`](risks.md) round-trip row.
+- **ADR-002 (blocking 2):** added a **trust-boundary** decision — CI-generated
+  checksum manifest bundled in the payload catches wrong-platform/mismatched/
+  corrupt binaries but **not** a maliciously rebuilt payload; **signing /
+  provenance attestation deferred** (ADR-009 / dedicated supply-chain ADR).
+  Residual supply-chain risk made explicit in [`risks.md`](risks.md).
+- **ADR-005 (blocking 3):** **narrowed** the atomicity claim to **per-file**
+  atomicity; the **cross-file transaction model** (staging manifest, commit
+  ordering, recovery/rollback, partial-commit detection) is explicitly deferred
+  to **ADR-006**. Softened the criteria 3/20 "follows" claim to "necessary
+  primitive, completed by ADR-006" and the untrusted-input claim to
+  "contributes to" — mirrored in [`risks.md`](risks.md). ADR-006 remains the
+  owner of staged inspect/plan/apply mechanics.
+- **ADR-004 (blocking 4):** clarified baseline is a **differential filter** that
+  **cannot** suppress malformed YAML (parse must precede comparison) or override
+  criterion 7 in release-gate/CI runs; specified exit-code behavior; **moved
+  severity precedence into the Decision section**.
+- **ADR-003 (non-blocking):** documented JSON opt-in via **`--json`** on every
+  command and **deferred exact numeric exit-code values** to the implementation
+  issue.
+
+**Validation:** re-ran `check-plan --criteria-set adr` on all five (deterministic
+ADR-C1–C4 pass; ADR-C5 expected forward-ref warnings for ADR-006/008/009/010).
+No `{{`/`}}`/`_TBD_` placeholders introduced; all five statuses remain
+`proposed`. **Gate status:** ready to **rerun the Codex ADR review gate**.
+
 ### 2026-06-30 — Knowledge layer reconciled to canonical file set
 
 Aligned `knowledge/` with the project's explicit layer spec: added

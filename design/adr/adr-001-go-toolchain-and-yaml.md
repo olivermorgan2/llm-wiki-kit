@@ -11,9 +11,14 @@ authority for parsing, validation, indexing, and safe filesystem writes
 before the first engine implementation issue: the Go language line and the YAML
 library. Binding constraints:
 
-- Acceptance criterion 6 (addendum 001) requires unknown frontmatter fields
-  **and comments** to survive authoring and enrichment — i.e. YAML
-  **round-trip preservation**.
+- Acceptance criterion 6 (addendum 001) is the **binding** requirement:
+  **unknown frontmatter fields survive authoring and enrichment** — i.e. YAML
+  **round-trip preservation** of fields the engine does not model. Preserving
+  YAML **comments** where feasible is a chosen **design-quality bar**, *not* a
+  binding acceptance criterion: criterion 6 names only unknown fields, and no
+  addendum or acceptance fixture makes comment loss a gate failure. Comment
+  preservation is therefore best-effort and **non-blocking** — a nice-to-have
+  the chosen library affords, not something the ship gate tests.
 - `gopkg.in/yaml.v3` is archived / unmaintained as of 2025.
 - Users must not install Go, Python, Node, or third-party libraries (PRD §9).
 
@@ -26,8 +31,10 @@ ADR-001 *candidate* (open-questions Q2; addendum 002 A5; build-out-plan
 
 ### Option A: Go 1.24.x + github.com/goccy/go-yaml
 
-- Pros: node/AST-aware parsing enables comment- and unknown-field-preserving
-  round-trips, satisfying criterion 6 directly; actively maintained; Go 1.24.x
+- Pros: node/AST-aware parsing preserves unknown frontmatter fields on
+  round-trip, satisfying the binding criterion 6 directly, and preserves
+  comments where feasible as a best-effort (non-gated) design-quality bonus;
+  actively maintained; Go 1.24.x
   is a conservative current-stable line with broad CI-runner coverage on all
   five target platforms; static single-binary builds need no user runtime
   (PRD §9); the YAML choice can be confined behind one internal adapter.
@@ -40,14 +47,16 @@ ADR-001 *candidate* (open-questions Q2; addendum 002 A5; build-out-plan
 - Pros: historically the default, widely understood Marshal/Unmarshal API;
   zero migration for engineers who already know it.
 - Cons: archived/unmaintained since 2025 (no security fixes); its decode model
-  drops comments and is not reliably node-aware, so round-trip preservation
-  (criterion 6) would need a brittle bolt-on; stakes a hard acceptance
-  criterion on an abandoned library.
+  is not reliably node-aware (and drops comments), so unknown-field round-trip
+  preservation (criterion 6) would need a brittle bolt-on; stakes a hard
+  acceptance criterion on an abandoned library.
 
 ## Decision
 
 Adopt **Option A** — Go 1.24.x with `github.com/goccy/go-yaml`. Criterion 6's
-round-trip requirement makes a node-aware library non-negotiable, and yaml.v3's
+unknown-field round-trip requirement makes a node-aware library
+non-negotiable (comment preservation is a best-effort bonus, not the driver),
+and yaml.v3's
 archived status removes it as a responsible default; Go 1.24.x gives broad,
 runtime-free cross-platform builds. The exact patch is pinned in `go.mod` at the
 first-engine-issue time. YAML behavior is confined to the engine's YAML adapter
@@ -56,7 +65,8 @@ behind an internal interface, so a future revision changes only that adapter and
 
 ## Consequences
 
-- Easier: criterion 6 round-trip preservation has a library built for it;
+- Easier: criterion 6 unknown-field round-trip preservation has a library
+  built for it, and best-effort comment preservation comes largely for free;
   runtime-free single-binary distribution on all five platforms; one place
   (the YAML adapter) owns all serialization behavior.
 - Harder: engineers work against goccy's node API rather than plain struct

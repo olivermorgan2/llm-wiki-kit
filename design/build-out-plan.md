@@ -63,9 +63,11 @@ gate that closes MVP.
     toolchain ADR and `go.mod`.
   - **Toolchain — YAML library (MVP assumption, ADR-001 candidate, Q2).** Use
     **`github.com/goccy/go-yaml`** for deterministic, node-aware YAML
-    parsing/editing. Rationale: acceptance criterion 6 requires unknown-field
-    (and comment) **round-trip preservation**, which needs a node/AST-aware
-    library; and the formerly default `gopkg.in/yaml.v3` is archived /
+    parsing/editing. Rationale: acceptance criterion 6 (binding) requires
+    unknown-field **round-trip preservation**, which needs a node/AST-aware
+    library; comment preservation is a best-effort, non-gated bonus the same
+    library affords (see ADR-001). The formerly default `gopkg.in/yaml.v3` is
+    archived /
     unmaintained as of 2025. Reversible: confined to the engine's YAML
     adapter behind an internal interface.
   - **Planning assumptions A1–A5** from
@@ -413,10 +415,12 @@ only; the parity test in Phase 6 is a hard gate.
 
 ### Risk 2 — Round-trip data loss on author/enrich
 
-A YAML library that doesn't preserve unknown fields/comments silently drops
-human content (fails criterion 6) and erodes trust. *Mitigation:* node-aware
-`goccy/go-yaml` (ADR-001); unknown-field round-trip fixture in Phase 3; the
-staged plan always previews before write.
+A YAML library that doesn't preserve unknown fields silently drops human
+content (fails the binding criterion 6) and erodes trust; comment loss is a
+lesser, non-gated quality concern. *Mitigation:* node-aware `goccy/go-yaml`
+(ADR-001) preserves unknown fields (gated) and comments (best-effort);
+unknown-field round-trip fixture in Phase 3; the staged plan always previews
+before write.
 
 ### Risk 3 — Assumptions silently treated as final decisions
 

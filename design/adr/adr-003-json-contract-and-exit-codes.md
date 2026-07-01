@@ -56,6 +56,21 @@ addendum 002 A4. This is the contract every adapter and CI invoker depends on an
 the precondition for identical findings across surfaces (criterion 15). Advances
 open-question Q8.
 
+**Output-mode selection.** Human-readable text is the **default** for a direct
+interactive terminal; the JSON envelope is opt-in via an explicit **`--json`**
+flag (or equivalent, e.g. a `LLM_WIKI_JSON` env toggle) available on **every**
+command. Machine surfaces (skills, hooks, CI) always pass `--json`. So "one
+envelope shared by every surface" means one *schema* whenever JSON is emitted —
+not that JSON is the unconditional default output.
+
+**Exit-code values.** This ADR fixes the **six semantic buckets** (success /
+success-with-warnings / validation-failure / approval-required /
+invalid-invocation / system-or-filesystem-failure) and their 1:1 mapping to PRD
+§12 outcomes. The **exact numeric values** are **deferred to the implementation
+issue**, which must publish the stable code→meaning table before Phase 1 closes
+(the "documented stable exit codes" acceptance hook); once published they are a
+frozen public surface.
+
 ## Consequences
 
 - Easier: criterion 14 conformance is a single schema to test; one envelope makes
