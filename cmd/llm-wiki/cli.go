@@ -47,6 +47,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if len(positional) == 0 {
+		if jsonMode {
+			env := contract.New("", contract.StatusInvalidInvocation)
+			return emit(stdout, env)
+		}
 		fmt.Fprint(stderr, usage)
 		return int(contract.ExitInvalidInvocation)
 	}

@@ -170,3 +170,39 @@ func TestNoCommandIsInvalidInvocation(t *testing.T) {
 		t.Error("a bare invocation should print usage to stderr")
 	}
 }
+
+// A bare invocation under JSON mode must still receive the v1 envelope on
+// stdout, not human usage on stderr — machine surfaces contract on the
+// envelope even for invalid invocation (ADR-003, #1).
+func TestNoCommandJSONFlagEmitsInvalidInvocationEnvelope(t *testing.T) {
+	stdout, stderr, code := exec(t, "--json")
+
+	env := decodeEnvelope(t, stdout)
+	if env.Status != contract.StatusInvalidInvocation {
+		t.Errorf("status = %q, want %q", env.Status, contract.StatusInvalidInvocation)
+	}
+	if code != int(contract.ExitInvalidInvocation) {
+		t.Errorf("exit code = %d, want %d", code, int(contract.ExitInvalidInvocation))
+	}
+	if stderr != "" {
+		t.Errorf("JSON-mode error must not print human usage to stderr: %s", stderr)
+	}
+}
+
+// The LLM_WIKI_JSON env toggle selects the envelope for a bare invocation just
+// like the flag does.
+func TestNoCommandJSONEnvEmitsInvalidInvocationEnvelope(t *testing.T) {
+	t.Setenv("LLM_WIKI_JSON", "1")
+	stdout, stderr, code := exec(t)
+
+	env := decodeEnvelope(t, stdout)
+	if env.Status != contract.StatusInvalidInvocation {
+		t.Errorf("status = %q, want %q", env.Status, contract.StatusInvalidInvocation)
+	}
+	if code != int(contract.ExitInvalidInvocation) {
+		t.Errorf("exit code = %d, want %d", code, int(contract.ExitInvalidInvocation))
+	}
+	if stderr != "" {
+		t.Errorf("JSON-mode error must not print human usage to stderr: %s", stderr)
+	}
+}
