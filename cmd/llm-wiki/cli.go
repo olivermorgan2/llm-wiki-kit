@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/olivermorgan2/llm-wiki-kit/internal/contract"
+	"github.com/olivermorgan2/llm-wiki-kit/internal/platform"
 	"github.com/olivermorgan2/llm-wiki-kit/internal/validate"
 )
 
@@ -22,6 +24,9 @@ Usage:
 Commands:
   version     Print the engine version.
   validate    Validate repository contents (no rules implemented yet).
+  selfcheck   Verify this platform's shipped binary against its bundled
+              checksum (ADR-002). Use --root <dir> to point at the bundle;
+              defaults to the directory containing the running executable.
 
 Flags:
   --json      Emit the versioned JSON contract envelope instead of human text.
@@ -61,6 +66,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runVersion(stdout, jsonMode)
 	case "validate":
 		return runValidate(cmdArgs, stdout, jsonMode)
+	case "selfcheck":
+		return runSelfcheck(cmdArgs, stdout, stderr, jsonMode)
 	default:
 		return runUnknown(command, stdout, stderr, jsonMode)
 	}
@@ -94,6 +101,67 @@ func runValidate(paths []string, stdout io.Writer, jsonMode bool) int {
 		return emit(stdout, env)
 	}
 	fmt.Fprintf(stdout, "validate: OK — %d finding(s) (no validation rules implemented yet)\n", len(findings))
+	return int(contract.ExitCodeForStatus(env.Status))
+}
+
+// runSelfcheck detects the running platform and verifies its shipped binary
+// against the bundled SHA256SUMS manifest (ADR-002). It fails closed: any
+// verification error maps to the contract's system-or-filesystem-failure bucket
+// (exit 5). Consistent with the other commands, the outcome is carried by the
+// envelope status rather than a validation finding — findings are OKF/profile
+// results (ADR-004), not integrity failures.
+func runSelfcheck(args []string, stdout, stderr io.Writer, jsonMode bool) int {
+	root, err := selfcheckRoot(args)
+	if err == nil {
+		var p platform.Platform
+		p, err = platform.VerifyBundle(os.DirFS(root))
+		if err == nil {
+			return selfcheckOK(stdout, jsonMode, p.ArtifactPath())
+		}
+	}
+	return selfcheckFail(stdout, stderr, jsonMode, err)
+}
+
+// selfcheckRoot resolves the bundle root: an explicit --root/--root=<dir> flag,
+// otherwise the directory containing the running executable (where the plugin
+// ships bin/ alongside the engine).
+func selfcheckRoot(args []string) (string, error) {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--root" || a == "-root":
+			if i+1 >= len(args) {
+				return "", fmt.Errorf("--root requires a directory argument")
+			}
+			return args[i+1], nil
+		case strings.HasPrefix(a, "--root="):
+			return strings.TrimPrefix(a, "--root="), nil
+		case strings.HasPrefix(a, "-root="):
+			return strings.TrimPrefix(a, "-root="), nil
+		}
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("locate executable: %w", err)
+	}
+	return filepath.Dir(exe), nil
+}
+
+func selfcheckOK(stdout io.Writer, jsonMode bool, artifact string) int {
+	env := contract.New("selfcheck", contract.StatusSuccess)
+	if jsonMode {
+		return emit(stdout, env)
+	}
+	fmt.Fprintf(stdout, "selfcheck: OK — verified %s\n", artifact)
+	return int(contract.ExitCodeForStatus(env.Status))
+}
+
+func selfcheckFail(stdout, stderr io.Writer, jsonMode bool, cause error) int {
+	env := contract.New("selfcheck", contract.StatusSystemFailure)
+	if jsonMode {
+		return emit(stdout, env)
+	}
+	fmt.Fprintf(stderr, "llm-wiki: selfcheck failed: %v\n", cause)
 	return int(contract.ExitCodeForStatus(env.Status))
 }
 
