@@ -183,6 +183,32 @@ only on acceptance do Q2/Q7/Q8 flip to `closed` (with a back-reference here) and
 do accepted ADRs become inputs to `/prepare-issue` for Phase 1. No product/source
 code was created; no remote side effects.
 
+### 2026-07-01 — Codex ADR-001–005 review — verdict `NEEDS_REVISION`
+
+Ran the adversarial Codex milestone/ADR review gate over proposed ADR-001–005.
+The verbatim review artifact is archived at
+[`reviews/2026-07-01-codex-adr-001-005-review.md`](reviews/2026-07-01-codex-adr-001-005-review.md).
+
+**Four blocking findings, accepted as revision targets:**
+
+1. ADR-001 overstates acceptance criterion 6 by treating YAML comment
+   preservation as binding; criterion 6 only says unknown frontmatter fields
+   survive. Distinguish binding requirement vs best-effort design quality, or
+   promote comment preservation to an authoritative addendum/fixture.
+2. ADR-002 specifies checksum verification but not the checksum trust root or
+   residual supply-chain risk. Define manifest/source/signing boundary or
+   explicitly defer provenance/signing.
+3. ADR-005 claims all-or-nothing multi-file interruption safety without a
+   transaction model. Define staging/manifest/recovery behavior or narrow the
+   claim to per-file atomicity and defer cross-file transaction semantics.
+4. ADR-004 baseline suppression conflicts ambiguously with hard validation
+   failures. Clarify whether malformed YAML / missing required fields can ever
+   be baseline-suppressed and how exit codes behave.
+
+**Gate status:** ADR-001–005 remain **`proposed`** and **not accepted**.
+Next step is a bounded Claude Code revision pass, then a second Codex ADR review
+before human acceptance / closing Q2/Q7/Q8.
+
 ### 2026-06-30 — Knowledge layer reconciled to canonical file set
 
 Aligned `knowledge/` with the project's explicit layer spec: added
