@@ -319,6 +319,54 @@ ADR-006/008/009/010, still undrafted); `sync-adr-index` clean; no
 before any cross-file mutation/transaction work begins. No GitHub issues were
 created in this session; no remote side effects.
 
+### 2026-07-01 — Phase 1 backlog filed as GitHub issues #1–#6; issue #1 prompt prepared
+
+Ran the `issue-planner` flow over `design/build-out-plan.md` §"Foundation —
+Phase 1" and filed the six Phase-1 (Slice 0, "Engine + contract spine") issues
+in `olivermorgan2/llm-wiki-kit`, all under a new **`Foundation`** milestone
+(CLAUDE.md canonical; the build-out plan groups Phases 1–2 there). Only the
+Phase 1 slice was filed this session; Phases 2–7 remain in the plan backlog.
+
+- **#1** CLI skeleton + versioned JSON-contract spine (ADR-001, ADR-003) —
+  `feature`. Merges build-out bullets "scaffold `cmd`/`internal`" + "JSON
+  contract envelope + exit codes" per the documented first-issue boundary in
+  [`../notes/phase-1-first-issue-spec.md`](../notes/phase-1-first-issue-spec.md).
+- **#2** OS/arch detection + release-artifact checksum verification (ADR-002) —
+  `infra`. Ship/select/verify **only**; installer/asset-ownership + signing
+  stay **ADR-009** (named out-of-scope in the body).
+- **#3** Core-profile `validate`, OKF-vs-profile, three severities (ADR-004) —
+  `feature`.
+- **#4** Broken-link detection at configured severity (ADR-004) — `feature`.
+- **#5** Safe filesystem layer — per-file atomic write, symlink/path-traversal
+  rejection (ADR-005) — `security`. Per-file atomicity **only**; cross-file
+  transaction/staged mutation deferred to **ADR-006** (named out-of-scope).
+- **#6** Core-profile fixtures + traversal/symlink testdata (ADR-004, ADR-005)
+  — `infra`.
+
+**Labels:** created the CLAUDE.md primary labels the drafts needed
+(`feature`, `infra`, `security`) — the freshly-bootstrapped repo carried only
+GitHub defaults. One primary label per issue, per CLAUDE.md.
+
+**Project board: skipped.** The authenticated `gh` token
+(`gist, read:org, repo`) lacks the `project` OAuth scope, so ADR-012's Project
+board step was skipped rather than silently downgraded. Re-run with
+`gh auth refresh -s project,read:project` if a board is wanted later.
+
+**Prompt prepared:** ran the `prepare-issue` fill for #1 →
+[`../prompts/issue-001-cli-contract-spine.md`](../prompts/issue-001-cli-contract-spine.md).
+No `bin/check-plan` ships in this scaffold, so the pre-write gate was run
+**manually** against `check-plan` `criteria.md` PROMPT-C1–C6: deterministic
+C1/C2/C3/C6 pass, warning C4/C5 clean; all ADR path refs resolve. `design/state.md`
+does not exist (this project uses the `knowledge/` layer), so that step was skipped.
+
+**Scope discipline:** no product/source code written; no ADR or plan file
+edited in place. Carry-forwards preserved in issue bodies — ADR-003 numeric
+exit-code table (before Phase 1 closes), ADR-006 before any cross-file mutation,
+ADR-002 ≠ ADR-009 installer boundary.
+
+**Next step:** implement **#1** via `/claude-issue-executor` (plan-first, one
+issue per session); draft **ADR-006** before any cross-file mutation work.
+
 ### 2026-06-30 — Knowledge layer reconciled to canonical file set
 
 Aligned `knowledge/` with the project's explicit layer spec: added

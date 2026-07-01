@@ -5,8 +5,9 @@ Front door to the `llm-wiki-kit` knowledge layer. Conventions live in
 
 ## Current phase
 
-**ADR-001–005 human-accepted (2026-07-01) — entering Phase 1 (engine + contract
-spine) issue prep.** Bootstrapped 2026-06-30 from `claude-workflow-kit` v5.0.1.
+**ADR-001–005 human-accepted (2026-07-01); Phase 1 (engine + contract spine)
+backlog filed as GitHub issues #1–#6, first prompt prepared — implementation
+next.** Bootstrapped 2026-06-30 from `claude-workflow-kit` v5.0.1.
 Source PRD normalized; adversarial Codex review (`NEEDS_REVISION`) landed as PRD
 addenda 001–005; `/prd-to-mvp` produced [`design/mvp.md`](../design/mvp.md) and
 [`design/build-out-plan.md`](../design/build-out-plan.md) (7 phases / Slices
@@ -45,13 +46,28 @@ questions **Q2/Q7/Q8 closed** with ADR + log back-references. See
 
 ## Next action
 
-**Prepare the first Phase 1 implementation issue** — the deterministic CLI
-skeleton + JSON-contract spine enabled by accepted ADR-001/003/004/005. A local
-pre-issue spec is drafted at
-[`notes/phase-1-first-issue-spec.md`](../notes/phase-1-first-issue-spec.md); the
-next workflow step is to file the Phase 1 backlog as GitHub issues
-(`/issue-planner`) and then `/prepare-issue` per issue. **No GitHub issues have
-been created yet.**
+**Phase 1 backlog filed as GitHub issues #1–#6 (2026-07-01)** under the
+`Foundation` milestone; the first issue's prompt is prepared at
+[`../prompts/issue-001-cli-contract-spine.md`](../prompts/issue-001-cli-contract-spine.md).
+The next workflow step is to **implement issue #1** via `/claude-issue-executor`
+(plan-first, one issue per session), and in parallel **draft ADR-006** before
+any cross-file mutation work begins.
+
+Phase 1 issues (all `Foundation`, repo `olivermorgan2/llm-wiki-kit`):
+
+| # | Title (abbrev.) | ADR(s) | Label |
+|---|---|---|---|
+| [#1](https://github.com/olivermorgan2/llm-wiki-kit/issues/1) | CLI skeleton + versioned JSON-contract spine | 001, 003 | feature |
+| [#2](https://github.com/olivermorgan2/llm-wiki-kit/issues/2) | OS/arch detection + checksum verification | 002 | infra |
+| [#3](https://github.com/olivermorgan2/llm-wiki-kit/issues/3) | Core-profile `validate`, OKF-vs-profile, 3 severities | 004 | feature |
+| [#4](https://github.com/olivermorgan2/llm-wiki-kit/issues/4) | Broken-link detection at configured severity | 004 | feature |
+| [#5](https://github.com/olivermorgan2/llm-wiki-kit/issues/5) | Safe filesystem layer (per-file atomic, symlink/traversal) | 005 | security |
+| [#6](https://github.com/olivermorgan2/llm-wiki-kit/issues/6) | Core-profile fixtures + traversal/symlink testdata | 004, 005 | infra |
+
+The [`notes/phase-1-first-issue-spec.md`](../notes/phase-1-first-issue-spec.md)
+pre-issue spec is now realized as issue #1. **No GitHub Project board was
+created** — the authenticated `gh` token lacks the `project` OAuth scope
+(ADR-012's board step skipped; issues stand alone).
 
 Explicit carry-forwards to hold in the first issue and beyond:
 
