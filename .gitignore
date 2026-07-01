@@ -21,6 +21,13 @@
 # (see docs/receipts.md).
 .claude/receipts/
 
+# Go build outputs
+# The engine binary when built into the repo root (ships under bin/ instead).
+/llm-wiki
+/llm-wiki.exe
+*.test
+*.out
+
 # Common build outputs (uncomment as your project requires)
 # node_modules/
 # __pycache__/

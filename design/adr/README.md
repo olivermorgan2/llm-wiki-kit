@@ -13,7 +13,12 @@ outside the fences is preserved.
 
 <!-- adr-index:start -->
 
-_(no ADRs yet — run `/adr-writer` to draft one, then run
-`.claude/bin/sync-adr-index` to populate this table.)_
+| ADR | Title | Status |
+|---|---|---|
+| [ADR-001](adr-001-go-toolchain-and-yaml.md) | Adopt Go 1.24.x and goccy/go-yaml for the engine toolchain | accepted |
+| [ADR-002](adr-002-platform-binary-selection.md) | Ship and select one checksum-verified platform binary | accepted |
+| [ADR-003](adr-003-json-contract-and-exit-codes.md) | Versioned JSON skill–engine contract (v1) and a fixed exit-code set | accepted |
+| [ADR-004](adr-004-validation-and-severity-model.md) | Separate OKF/profile reporting with a three-severity validation model | accepted |
+| [ADR-005](adr-005-safe-filesystem-layer.md) | Mandatory engine filesystem-safety gate | accepted |
 
 <!-- adr-index:end -->

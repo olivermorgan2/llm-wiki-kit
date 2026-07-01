@@ -9,7 +9,7 @@
   here so `/prd-to-mvp` has them as a first-class planning input without
   re-reading `design/prd.md`. This addendum is authoritative alongside
   `prd-normalized.md`; the normalized file is not regenerated.
-- **Knowledge links:** `knowledge/decisions.md` (verdict entry);
+- **Knowledge links:** `knowledge/log.md` (verdict entry);
   `knowledge/risks.md` ("Canonical normalized PRD omits acceptance
   criteria"); dogfood note in `notes/workflow-kit-notes.md`.
 

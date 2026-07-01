@@ -23,7 +23,7 @@ the tool's documented output, not a manual in-place edit.
   decision (accept / reject / defer), and the precise change to the
   normalized PRD's field(s).
 - Cross-reference the matching entry in
-  [`../../knowledge/decisions.md`](../../knowledge/decisions.md); open
+  [`../../knowledge/log.md`](../../knowledge/log.md); open
   items spawned by a finding go to
   [`../../knowledge/open-questions.md`](../../knowledge/open-questions.md)
   and risks to [`../../knowledge/risks.md`](../../knowledge/risks.md).
