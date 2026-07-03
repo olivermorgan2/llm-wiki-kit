@@ -65,8 +65,14 @@ Generate it locally with:
 go run ./cmd/gen-checksums -root <bundle-root>   # writes <root>/bin/SHA256SUMS
 ```
 
-The full multi-platform release pipeline that builds the five binaries and runs
-the generator in CI is deferred to a later infra issue.
+CI's `build-bundle` job cross-compiles all five targets into this layout
+(`CGO_ENABLED=0`, `-trimpath`), runs `gen-checksums` to produce the manifest,
+and a per-platform `selfcheck-smoke` matrix then verifies selection and
+integrity on every target — the positive path asserts each runner selects and
+verifies its own artifact, and a negative path corrupts the binary to confirm
+selfcheck fails closed. GitHub Release publishing, signing / provenance
+attestation, and marketplace packaging remain deferred (see ADR-002 and
+[`knowledge/risks.md`](../../knowledge/risks.md)).
 
 ## Verifying: `llm-wiki selfcheck`
 
