@@ -81,6 +81,12 @@ var txnIDRe = regexp.MustCompile(`^[0-9a-f]{16}$`)
 // stagingRootRel is the boundary-relative staging root (.llm-wiki/staging).
 var stagingRootRel = filepath.Join(fsafe.StagingDir, "staging")
 
+// stagingRootComps is the chain of path components from the canonical boundary
+// root down to the staging root. verifyStagingRoot walks these to prove no
+// component is a symlink, so neither a directory scan nor a recursive delete of
+// staging can be redirected outside the boundary.
+var stagingRootComps = []string{fsafe.StagingDir, "staging"}
+
 // Reserved target prefixes (slash form). Targets elsewhere under .llm-wiki (e.g.
 // .llm-wiki/manifest.json, which ADR-009's install writes through a transaction)
 // are allowed; only these two engine subtrees are refused.
@@ -302,13 +308,48 @@ func (t *Txn) cleanup() error {
 	return t.removeTxnDir()
 }
 
+// verifyStagingRoot confirms every path component from the canonical boundary
+// root down to .llm-wiki/staging is a real, non-symlink directory. Because the
+// root is canonical (fsafe.New EvalSymlinks-resolved it), a chain of real dir
+// components cannot be redirected outside the boundary: an os.ReadDir scan or an
+// os.RemoveAll of a staging txn dir walks names that all resolve inside the
+// boundary. A symlinked component is refused with fsafe.ErrSymlinkEscape; a
+// missing component surfaces fs.ErrNotExist so callers can treat an absent
+// staging area as "nothing to do".
+func (t *Txn) verifyStagingRoot() error {
+	cur := t.root
+	for _, c := range stagingRootComps {
+		cur = filepath.Join(cur, c)
+		info, err := os.Lstat(cur)
+		if err != nil {
+			return err // fs.ErrNotExist passes through for the no-staging path
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("%w: staging component %q is a symlink", fsafe.ErrSymlinkEscape, cur)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("txn: staging component %q is not a directory", cur)
+		}
+	}
+	return nil
+}
+
 // removeTxnDir os.RemoveAll's the transaction dir after confirming its id is a
-// valid 16-hex token and it is not a symlink. The area is engine-owned and
-// RemoveAll does not follow symlinks, so no recursive-delete gate primitive is
-// needed.
+// valid 16-hex token, its .llm-wiki/staging parent chain is all real non-symlink
+// dirs, and the txn dir itself is not a symlink. Validating the parent chain
+// (not only the final dir) is what keeps the recursive delete from following a
+// poisoned .llm-wiki or .llm-wiki/staging symlink outside the boundary; with the
+// path so anchored, os.RemoveAll (which does not follow the final symlink and
+// removes inner entries fd-relative) needs no extra gate primitive.
 func (t *Txn) removeTxnDir() error {
 	if !txnIDRe.MatchString(t.id) {
 		return fmt.Errorf("txn: refusing to remove staging dir with invalid id %q", t.id)
+	}
+	if err := t.verifyStagingRoot(); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil // staging root absent: nothing to remove
+		}
+		return err
 	}
 	dir := t.abs(t.txnDirRel())
 	info, err := os.Lstat(dir)

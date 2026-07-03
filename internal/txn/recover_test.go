@@ -480,6 +480,118 @@ func TestBeginRefusesPoisonedStagingSymlink(t *testing.T) {
 	}
 }
 
+// A manifest whose recorded txn id does not match its staging dir is not a
+// trustworthy in-flight transaction: Recover must treat it as garbage and clean
+// it up rather than drive recovery from its (untrusted) entries and journal.
+func TestRecoverCleansManifestWithMismatchedTxnID(t *testing.T) {
+	root := t.TempDir()
+	canon := canonRoot(t, root)
+	seed(t, canon, "victim.md", "original", 0o644)
+	pre := snapshot(t, canon)
+
+	id := "0123456789abcdef"
+	dir := filepath.Join(stagingRootAbs(canon), id)
+	if err := os.MkdirAll(filepath.Join(dir, "journal"), 0o755); err != nil {
+		t.Fatalf("mkdir staging txn: %v", err)
+	}
+	// Manifest bound to a different txn id, with an entry that would mutate the
+	// tree if recovery trusted it.
+	m := manifest{Version: manifestVersion, Txn: "ffffffffffffffff", Entries: []manifestEntry{
+		{Path: "victim.md", Mode: 0o644, Staged: hashBytes([]byte("HACKED")), Base: absentBase()},
+	}}
+	data, err := marshalManifest(m)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "manifest.json"), data, 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+	// An intent marker: without the id check, recovery would try to roll this
+	// forward/back from the untrusted manifest.
+	if err := os.WriteFile(filepath.Join(dir, "journal", jIntent), []byte("{}"), 0o644); err != nil {
+		t.Fatalf("write intent marker: %v", err)
+	}
+
+	rep, err := Recover(root)
+	if err != nil {
+		t.Fatalf("Recover: %v", err)
+	}
+	if len(rep.Transactions) != 1 || rep.Transactions[0].Outcome != CleanedUp {
+		t.Fatalf("report = %+v, want single CleanedUp", rep.Transactions)
+	}
+	assertTreeEqual(t, pre, snapshot(t, canon)) // victim.md untouched
+	if _, serr := os.Stat(dir); !os.IsNotExist(serr) {
+		t.Fatalf("mismatched-txn staging dir survived: %v", serr)
+	}
+}
+
+// seedOutsideTxnDir plants a manifest-less 16-hex "transaction" dir with a file
+// under outside, the shape Recover would garbage-collect if it followed a
+// poisoned staging symlink out of the boundary. Returns the txn dir path.
+func seedOutsideTxnDir(t *testing.T, dir string) string {
+	t.Helper()
+	txnDir := filepath.Join(dir, "0123456789abcdef")
+	if err := os.MkdirAll(filepath.Join(txnDir, "files"), 0o755); err != nil {
+		t.Fatalf("mkdir outside txn: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(txnDir, "files", "0000"), []byte("precious"), 0o644); err != nil {
+		t.Fatalf("seed outside txn: %v", err)
+	}
+	return txnDir
+}
+
+func assertOutsideTxnIntact(t *testing.T, txnDir string) {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(txnDir, "files", "0000"))
+	if err != nil {
+		t.Fatalf("outside content removed or unreadable: %v", err)
+	}
+	if string(b) != "precious" {
+		t.Fatalf("outside content mutated: got %q, want %q", b, "precious")
+	}
+}
+
+// Recover must not follow a poisoned .llm-wiki symlink out of the boundary and
+// garbage-collect the external directory it points at.
+func TestRecoverRefusesPoisonedLlmWikiSymlink(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	canon := canonRoot(t, root)
+
+	// .llm-wiki -> outside, so .llm-wiki/staging/<id> resolves to
+	// outside/staging/<id>, a manifest-less dir Recover would otherwise clean up.
+	outsideTxn := seedOutsideTxnDir(t, filepath.Join(outside, "staging"))
+	if err := os.Symlink(outside, filepath.Join(canon, ".llm-wiki")); err != nil {
+		t.Fatalf("symlink .llm-wiki: %v", err)
+	}
+
+	if _, err := Recover(root); err == nil {
+		t.Fatal("Recover through poisoned .llm-wiki symlink = nil error, want refusal")
+	}
+	assertOutsideTxnIntact(t, outsideTxn)
+}
+
+// Recover must not follow a poisoned .llm-wiki/staging symlink out of the
+// boundary, even when .llm-wiki itself is a real directory.
+func TestRecoverRefusesPoisonedStagingSymlink(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	canon := canonRoot(t, root)
+
+	outsideTxn := seedOutsideTxnDir(t, outside)
+	if err := os.MkdirAll(filepath.Join(canon, ".llm-wiki"), 0o755); err != nil {
+		t.Fatalf("mkdir .llm-wiki: %v", err)
+	}
+	if err := os.Symlink(outside, filepath.Join(canon, ".llm-wiki", "staging")); err != nil {
+		t.Fatalf("symlink staging: %v", err)
+	}
+
+	if _, err := Recover(root); err == nil {
+		t.Fatal("Recover through poisoned staging symlink = nil error, want refusal")
+	}
+	assertOutsideTxnIntact(t, outsideTxn)
+}
+
 func countRegularFiles(t *testing.T, dir string) int {
 	t.Helper()
 	n := 0

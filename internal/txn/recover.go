@@ -71,6 +71,18 @@ func recoverWithHook(boundary string, hook func(stepOp) error) (Report, error) {
 		return Report{}, err
 	}
 
+	// Validate the .llm-wiki/staging chain is real non-symlink dirs before any
+	// scan or delete, so a pre-planted poisoned staging symlink cannot redirect
+	// the ReadDir (or a later os.RemoveAll) outside the boundary. A missing chain
+	// component means there is nothing staged to recover.
+	probe := &Txn{gate: g, root: root}
+	if err := probe.verifyStagingRoot(); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return Report{}, nil
+		}
+		return Report{}, err
+	}
+
 	stagingAbs := filepath.Join(root, stagingRootRel)
 	dirents, err := os.ReadDir(stagingAbs)
 	if err != nil {
@@ -109,6 +121,12 @@ func (t *Txn) recoverOne() (Outcome, error) {
 	m, err := decodeManifest(data)
 	if err != nil {
 		return CleanedUp, t.removeTxnDir() // unreadable manifest: terminal garbage
+	}
+	if m.Txn != t.id {
+		// The manifest is not bound to this staging dir, so its entries and
+		// journal cannot be trusted to drive in-boundary mutations. Treat the
+		// dir as garbage rather than recovering from a mismatched manifest.
+		return CleanedUp, t.removeTxnDir()
 	}
 	t.manifest = m
 
