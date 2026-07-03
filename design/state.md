@@ -4,8 +4,10 @@ _Last updated: 2026-07-03_
 
 ## Current status
 
-- **Phase 2 / Install-init: complete** (pending milestone close on merge of this
-  PR, and Oliver's async ratification of ADR-006/007/009).
+- **Phase 2 / Install-init: complete** (pending a **manual** milestone close —
+  merging this PR closes issue #21 and drops milestone #2 to zero open issues, but
+  Hermes/Oliver must close the milestone by hand afterward — and Oliver's async
+  ratification of ADR-006/007/009).
 - **Next phase: Phase 3 / Authoring + staged mutation.**
 
 ## Phase 2 / Install-init — complete
@@ -21,7 +23,7 @@ multi-platform release builds + selection wiring with a per-platform selfcheck
 smoke (ADR-002); a five-platform CI test matrix; and a named, criterion-mapped
 install/init acceptance corpus that serves as the Phase 2 gate evidence.
 
-### Issues (all closed)
+### Issues (implementation closed; closeout #21 closes on merge)
 
 | Issue | Title | ADR |
 |-------|-------|-----|

@@ -63,7 +63,9 @@ closeout PR).** The evidence artifact is [`../design/state.md`](../design/state.
 verdict). Two caveats deferred with follow-ups: windows-amd64 full-suite RED
 (follow-up **#29**) and macos-amd64 no CI evidence (follow-up **#30**); the
 Phase 2 gate is **observed on 4/5** platforms, closed on inference for
-macos-amd64. Milestone #2 closes on merge of the #21 PR.
+macos-amd64. Merging the #21 PR closes issue #21; milestone #2
+(`Phase 2 — Install/init`) then reaches zero open issues but does **not**
+auto-close — Hermes/Oliver must **manually** close it after merge.
 
 Next moves, in order:
 

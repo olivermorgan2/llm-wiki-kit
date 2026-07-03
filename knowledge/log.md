@@ -468,8 +468,10 @@ proceeds (CI test matrix, ADR-006 transaction layer, release builds + selection,
 
 The full Phase 2 train (issues #14–#20) merged via PRs #22–#28; the closeout
 issue **#21** (this entry) refreshes [`../design/state.md`](../design/state.md)
-and the knowledge layer, records validation evidence, and closes the milestone
-(`Phase 2 — Install/init`, #2) on merge. **Docs-only — no product behavior
+and the knowledge layer, records validation evidence, and makes the milestone
+(`Phase 2 — Install/init`, #2) eligible for close. Merging closes issue #21;
+the milestone does **not** auto-close — Hermes/Oliver must **manually** close it
+once its open-issue count reaches zero. **Docs-only — no product behavior
 changed.** [`../design/state.md`](../design/state.md) is the authoritative
 evidence artifact; this entry is the log pointer.
 
@@ -507,7 +509,9 @@ platforms** (linux-amd64, linux-arm64, macos-arm64, windows-amd64);
 **Exit-criteria verdict:** the Phase 2 gate says criteria 2/3/4(core) pass on
 **all five** platforms; **4/5 were observed**, macos-amd64 by inference only.
 The closeout records the gap plainly and **does not claim 5/5** — the gate call
-is Hermes/Oliver's. Milestone #2 closes on merge of the #21 PR (not before).
+is Hermes/Oliver's. Merging the #21 PR closes issue #21, dropping milestone #2 to
+zero open issues; the milestone still requires a **manual** close by Hermes/Oliver
+afterward (GitHub does not auto-close it).
 
 **Next:** Oliver async-ratifies ADR-006/007/009 (still flagged, not blocking);
 **ADR-008 (provenance/citation) must be drafted + accepted before Phase 3**
