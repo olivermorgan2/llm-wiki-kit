@@ -30,11 +30,14 @@ What is already decided and constrains this ADR:
   rules must therefore land as **findings inside that existing engine**, not as
   a parallel checker.
 - **[ADR-006](adr-006-staged-mutation-transaction-model.md)** (accepted) owns
-  staged `plan`/`apply` mechanics, byte-level preservation, and the
-  approval-gated commit; it stated "the provenance/citation-**preservation
-  content rules** are out of scope here" — delegated to this ADR. ADR-008 may
-  add a plan-time content rule but must **route through the existing approval
-  path**, not a new commit mechanism.
+  staged mutation mechanics (`plan`/`apply`), byte-level preservation, and
+  **stale-plan rejection** — its only `apply` refusal; it has **no
+  content-approval gate**. It stated "the provenance/citation-**preservation
+  content rules** are out of scope here" — delegated to this ADR. The plan-time
+  citation-loss **content gate is therefore ADR-008-owned**, not an ADR-006
+  mechanism; and the block it triggers routes through the existing
+  **[ADR-003](adr-003-json-contract-and-exit-codes.md) `approval` member**, not
+  a new commit mechanism.
 - **[ADR-003](adr-003-json-contract-and-exit-codes.md)** (accepted) froze the v1
   envelope `{contractVersion, operation, status, findings, affectedPaths,
   approval}`. ADR-008 may add **rule codes** inside `findings` and use the
