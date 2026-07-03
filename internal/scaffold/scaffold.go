@@ -25,18 +25,23 @@ const scaffoldMode fs.FileMode = 0o644
 // timestampLayout renders the injected clock into the OKF `timestamp` field.
 const timestampLayout = "2006-01-02"
 
+// OKFVersion pins the OKF target version a scaffolded bundle targets
+// (design/prd.md). It is interpolated into the bundle config's `okfVersion`
+// field and single-sources the value issue #19's version record (ADR-009)
+// records in the install manifest, so the manifest's `okf` field and the
+// written config never drift.
+const OKFVersion = "0.1"
+
 // configTemplate is the bundle config written at the bundle root. It is a static
-// literal — the profile reference (id + version) is interpolated from the
-// resolved Profile, but no YAML library marshals it (ADR-001 confines YAML to
-// the adapter, and a byte literal invokes none). `okfVersion` pins the OKF
-// target version the bundle targets (design/prd.md); issue #19's version record
-// will reference it. The `profile:` block is the ADR-007 reference — init copies
-// no rule data.
+// literal — the profile reference (id + version) and OKFVersion are interpolated,
+// but no YAML library marshals it (ADR-001 confines YAML to the adapter, and a
+// byte literal invokes none). The `profile:` block is the ADR-007 reference —
+// init copies no rule data.
 const configTemplate = `# llm-wiki bundle configuration.
 # Records the bundle format and the active validation profile. This is a
 # reference to the shipped profile, not a copy of its rule data (ADR-007).
 bundleFormat: 1
-okfVersion: "0.1"
+okfVersion: "%s"
 profile:
   id: %s
   version: "%s"
@@ -92,7 +97,7 @@ func Plan(p profile.Profile, now time.Time) []txn.FileChange {
 	changes := []txn.FileChange{
 		{
 			Target: "llm-wiki.yaml",
-			Data:   []byte(fmt.Sprintf(configTemplate, p.ID, p.Version)),
+			Data:   []byte(fmt.Sprintf(configTemplate, OKFVersion, p.ID, p.Version)),
 			Mode:   scaffoldMode,
 		},
 		{
