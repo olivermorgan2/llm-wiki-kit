@@ -47,62 +47,94 @@ gate-evidence artefact. #20 adds exactly that — no product behavior changes.
 | **3** — non-empty repo, no file loss | `TestAcceptanceCriterion3InstallNonEmptyRepoNoFileLoss` | `seedNonEmptyRepo` → snapshot → `install --json` → snapshot | every seeded file (incl. `.git/*`) byte-identical; tree grows by exactly the 4 scaffold files; manifest catalogues only the 3 scaffold assets, no user files. |
 | **3** — collision refusal is zero-mutation | `TestAcceptanceCriterion3CollisionRefusalIsZeroMutation` | seed + user `llm-wiki.yaml` & `wiki/index.md` → snapshot → `install --json` → snapshot | exit 3; approval lists exactly the 2 conflicts (sorted, slash-form); whole tree byte-identical; `.llm-wiki/` absent (refusal precedes `txn.Begin`, ADR-006). |
 | **1** — install half (dry-run) | `TestAcceptanceCriterion1InstallDryRunFullPlanNoOp` | `seedNonEmptyRepo` → snapshot → `install --dry-run --json` → snapshot | exit 0; envelope lists the full 4-path plan; tree byte-identical; `.llm-wiki/` absent (dry-run returns before `txn.Begin`). |
-| **4 (core)** — init with core profile | `TestAcceptanceCriterion4InitCoreThenValidateClean` | empty dir → `init --json` → `validate --json` | exactly the 3 `initTargets`; **no** version-record manifest (init ≠ install); bundle validates clean. Core profile only (academic-research = Phase 4, custom = Phase 7). |
+| **4 (core)** — init with core profile | `TestAcceptanceCriterion4InitCoreThenValidateClean` | empty dir → `init --json` → `validate --json` | envelope `affectedPaths` = exactly the 3 `initTargets`, each present on disk; **no** ADR-009 version-record manifest (init ≠ install; the shared ADR-006 txn layer may still leave an empty `.llm-wiki/` working area, so the corpus asserts manifest-absence, not an exact whole-tree snapshot); bundle validates clean. Core profile only (academic-research = Phase 4, custom = Phase 7). |
 
 ## Verification
 
-**Local** (Go 1.24.13, `GOTOOLCHAIN=local`, `/Users/hermes/sdk/go1.24.13/bin/go`):
+Evidence is separated into five categories. **This PR does not prove
+"all five platforms green" or "full matrix green."** Read each category on
+its own terms.
+
+### 1. Local validation
+
+Go 1.24.13, `GOTOOLCHAIN=local`, `/Users/hermes/sdk/go1.24.13/bin/go`, on a
+Unix (developer macOS/arm64) host:
 
 ```
 gofmt -l .                                                       # empty
 go vet ./...                                                     # clean
 go build ./...                                                   # clean
-go test ./...                                                    # all packages pass
+go test ./...                                                    # all packages pass on this host
 go test ./cmd/llm-wiki -run '^TestAcceptance' -count=1 -v        # 6/6 PASS
 ```
 
-**CI** — run
+Note `go test ./...` passes locally because the host is Unix; the
+file-permission-mode assertions that fail on Windows (category 4) hold here.
+Local validation is single-host and is **not** evidence about any other
+platform.
+
+### 2. Named acceptance-step evidence (CI)
+
+The `Acceptance corpus (Phase 2 gate evidence)` CI step runs
+`go test ./cmd/llm-wiki -run '^TestAcceptance' -count=1 -v` before the full
+suite, per matrix leg. Latest observed evidence — run
 [28648011244](https://github.com/olivermorgan2/llm-wiki-kit/actions/runs/28648011244)
-(PR #27). Acceptance-corpus step result per platform:
+(branch tip `2ac87a6`; each push re-runs the matrix, so consult the newest
+run on PR #27 for the current tip):
 
-| Platform (ADR-002) | Acceptance step | `test` job |
+| Platform (ADR-002) | Acceptance step | Runner |
 |---|---|---|
-| linux-amd64 | **6/6 PASS** | green |
-| linux-arm64 | **6/6 PASS** | green |
-| macos-arm64 | **6/6 PASS** | green |
-| windows-amd64 | **6/6 PASS** | red — see caveat |
-| macos-amd64 | not run | queued — see caveat |
-| `cross-compile-smoke` (all 5 target binaries + checksum manifest) | — | green |
+| linux-amd64 | **6/6 PASS** | ran |
+| linux-arm64 | **6/6 PASS** | ran |
+| macos-arm64 | **6/6 PASS** | ran |
+| windows-amd64 | **6/6 PASS** | ran |
+| macos-amd64 | not run | runner unavailable (category 5) |
 
-The acceptance corpus passes on every platform where a runner executed it
-(4 of 5), including Windows.
+The acceptance corpus is green on **all four platforms where a runner executed
+it (4 of 5), including Windows**. It has **not** been observed on macos-amd64.
 
-### Caveats (both pre-existing / environmental, neither introduced by #20)
+### 3. Full CI matrix status — NOT green
 
-1. **windows-amd64 `test` job is red — but the acceptance step is green.**
-   The redness comes entirely from pre-existing Unix file-permission-mode
-   assertions in `internal/fsafe` and `internal/txn`
-   (`mode = -rw-rw-rw-, want -rw-r-----`, etc.) that do not hold on Windows.
-   These fail identically on `main`'s own CI run
-   ([28646677901](https://github.com/olivermorgan2/llm-wiki-kit/actions/runs/28646677901),
-   headSha `fb65639`, the commit this branch was cut from) — they predate #20
-   and live in `internal/`, which this issue's scope forbids touching (owned by
-   the txn/fsafe issues). Because the acceptance step targets only
-   `./cmd/llm-wiki`, it is placed **before** the full `go test ./...` step so it
-   still produces green per-platform evidence even while the unrelated suite is
-   red (a small, documented deviation from the plan's "after" ordering — see
-   below). The Windows acceptance step's own log shows all six criteria PASS.
+| Platform (ADR-002) | `test` job (full `go test ./...`) |
+|---|---|
+| linux-amd64 | green |
+| linux-arm64 | green |
+| macos-arm64 | green |
+| windows-amd64 | **RED** — pre-existing `internal/` tests (category 4) |
+| macos-amd64 | did not run (category 5) |
+| `cross-compile-smoke` (5 target binaries + checksum manifest) | green |
 
-2. **macos-amd64 leg never dispatched — macos-13 runner unavailable.**
-   The `macos-13` runner did not become available in this environment: the leg
-   stayed queued here, on the prior PR run it was cancelled by the
-   concurrency guard, and `main`'s own run has it queued as well. This is
-   runner-availability latency, not a code issue. The macos-amd64 code path is
-   identical to **macos-arm64, which is fully green including 6/6 acceptance
-   PASS**, and `cross-compile-smoke` builds the `darwin/amd64` binary cleanly.
+Three platforms are fully green. Windows' full job is red on unrelated
+pre-existing tests. macos-amd64 produced no full-suite evidence. The full
+matrix is therefore **not** green.
 
-Both caveats are for Hermes to weigh at the Phase 2 gate; neither is a #20
-regression.
+### 4. Known pre-existing failures (not introduced by #20)
+
+The windows-amd64 full `go test ./...` is red **only** in `internal/fsafe`
+and `internal/txn`, on Unix file-permission-mode assertions
+(`mode = -rw-rw-rw-, want -rw-r-----`, etc.) that cannot hold on Windows.
+These fail identically on `main`'s own CI run
+([28646677901](https://github.com/olivermorgan2/llm-wiki-kit/actions/runs/28646677901),
+headSha `fb65639`, the commit this branch was cut from) — they predate #20 and
+live in `internal/`, which this issue's scope forbids touching (owned by the
+txn/fsafe issues). Because the acceptance step targets only `./cmd/llm-wiki`
+and is ordered **before** the full suite (a declared deviation — see below), it
+still emits green Windows evidence (6/6 PASS, category 2) even though the job
+ends red.
+
+### 5. Unavailable-runner caveat (macos-amd64)
+
+The macos-amd64 (`macos-13`) leg did not dispatch: the runner did not become
+available in this environment. It stayed queued/never-ran here, was cancelled
+by the concurrency guard on prior pushes, and is likewise queued on `main`'s
+own run. This is runner-availability latency, not a code issue — but it means
+macos-amd64 has produced **no** acceptance evidence and **no** full-suite
+evidence. Its code path is identical to macos-arm64 (fully green, 6/6
+acceptance) and `cross-compile-smoke` builds the `darwin/amd64` binary cleanly;
+that is supporting **inference**, not observed per-platform CI.
+
+Both the Windows redness (category 4) and the macos-amd64 gap (category 5) are
+for Hermes to weigh at the Phase 2 gate; neither is a #20 regression.
 
 ## Deviation from the plan (declared)
 

@@ -101,9 +101,11 @@ func TestAcceptanceCriterion2VersionRunsOnHostPlatform(t *testing.T) {
 // TestAcceptanceCriterion3InstallNewRepoThenValidateClean — criterion 3
 // (install into a new repo) plus the ADR-009 version-record manifest and the
 // criterion-1 outcome that the freshly installed bundle validates clean.
-// Install into an empty dir writes exactly installTargets, the manifest
-// catalogues exactly the three scaffold assets (plugin-owned, hashes matching
-// on-disk bytes, never self-listed), and validate reports zero findings.
+// Install into an empty dir reports affectedPaths of exactly installTargets
+// (each present on disk), the manifest catalogues exactly the three scaffold
+// assets (plugin-owned, hashes matching on-disk bytes, never self-listed), and
+// validate reports zero findings. (Presence, not an exact whole-tree snapshot:
+// the ADR-006 txn layer may also leave an empty .llm-wiki/ working area.)
 func TestAcceptanceCriterion3InstallNewRepoThenValidateClean(t *testing.T) {
 	dir := t.TempDir()
 
@@ -361,7 +363,10 @@ func TestAcceptanceCriterion4InitCoreThenValidateClean(t *testing.T) {
 			t.Errorf("affectedPaths[%d] = %q, want %q", i, env.AffectedPaths[i], want)
 		}
 	}
-	// Exactly the three init targets on disk.
+	// Each of the three init targets is present on disk. (The envelope above
+	// already asserted affectedPaths is exactly initTargets; disk state may also
+	// hold an empty ADR-006 .llm-wiki/ working area, so this checks presence of
+	// the targets, not an exact whole-tree snapshot.)
 	for _, rel := range initTargets {
 		if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(rel))); err != nil {
 			t.Errorf("scaffold file %q missing: %v", rel, err)
