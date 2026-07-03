@@ -1,6 +1,6 @@
 # ADR-009: Install / upgrade / uninstall asset-ownership model
 
-**Status:** proposed
+**Status:** accepted
 **Date:** 2026-07-03
 
 ## Context

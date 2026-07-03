@@ -20,8 +20,8 @@ outside the fences is preserved.
 | [ADR-003](adr-003-json-contract-and-exit-codes.md) | Versioned JSON skill–engine contract (v1) and a fixed exit-code set | accepted |
 | [ADR-004](adr-004-validation-and-severity-model.md) | Separate OKF/profile reporting with a three-severity validation model | accepted |
 | [ADR-005](adr-005-safe-filesystem-layer.md) | Mandatory engine filesystem-safety gate | accepted |
-| [ADR-006](adr-006-staged-mutation-transaction-model.md) | Staged mutation lifecycle and cross-file transaction model | proposed |
-| [ADR-007](adr-007-profile-system-boundary.md) | Data-driven profile system with one inheritance level | proposed |
-| [ADR-009](adr-009-install-upgrade-uninstall-ownership.md) | Install / upgrade / uninstall asset-ownership model | proposed |
+| [ADR-006](adr-006-staged-mutation-transaction-model.md) | Staged mutation lifecycle and cross-file transaction model | accepted |
+| [ADR-007](adr-007-profile-system-boundary.md) | Data-driven profile system with one inheritance level | accepted |
+| [ADR-009](adr-009-install-upgrade-uninstall-ownership.md) | Install / upgrade / uninstall asset-ownership model | accepted |
 
 <!-- adr-index:end -->

@@ -1,6 +1,6 @@
 # ADR-007: Data-driven profile system with one inheritance level
 
-**Status:** proposed
+**Status:** accepted
 **Date:** 2026-07-03
 
 ## Context

@@ -1,6 +1,6 @@
 # ADR-006: Staged mutation lifecycle and cross-file transaction model
 
-**Status:** proposed
+**Status:** accepted
 **Date:** 2026-07-03
 
 ## Context

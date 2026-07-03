@@ -420,6 +420,50 @@ placeholders. No product/source code written; no accepted ADR edited in place.
 flip statuses to `accepted`, re-sync the index, close Q7's install-ownership
 remainder, and archive the review. Then Phase 2 train items 1–7 proceed.
 
+### 2026-07-03 — ADR-006/007/009 Codex re-review `READY`; accepted under mandate
+
+The independent Codex adversarial ADR gate re-ran on PR #22 after the loop-1
+revision commit and returned **`READY` (score 5/5), no blockers**. Both loop-1
+blockers are resolved — ADR-006's rollback is now **preimage-backed, not
+hash-inferred** (durable preimage records + absent sentinel + reverse-order
+journaled restore); ADR-009 fully specifies the ownership/version manifest
+(`.llm-wiki/manifest.json`, plugin-owned, written only through the ADR-006
+transaction, minimum schema, first-install/missing/corrupt/user-modified policy,
+default skip-and-report with explicit `--force`). All three loop-1 non-blocking
+findings (ADR-007 Phase 3/7 split, ADR-006 base-hash sentinel/non-regular
+handling, ADR-009 managed-asset vs repo-inventory wording) are also fixed. Two
+residual non-blocking items (ADR-006 roll-forward/rollback determinism, ADR-009
+`lastInstalledHash` for repo-owned assets) are schema/implementation detail, not
+ADR-acceptance blockers. Verbatim artifact archived at
+[`reviews/2026-07-03-codex-adr-006-007-009-rereview.md`](reviews/2026-07-03-codex-adr-006-007-009-rereview.md)
+(loop-1 `NEEDS_REVISION` record preserved alongside it).
+
+**Acceptance:** per the Phase-1-precedent gate, on `READY` the three statuses were
+flipped `proposed` → **`accepted`** under the **2026-07-03 autonomous-phase
+mandate** and are **flagged for Oliver's async ratification** (not a substitute
+for it). `sync-adr-index` regenerated `design/adr/README.md` — ADR-001–009 now
+show `accepted` (008 gap preserved).
+
+- **[ADR-006](../design/adr/adr-006-staged-mutation-transaction-model.md)** accepted — cross-file transaction model (criteria 3, 11, 12, 13, 20).
+- **[ADR-007](../design/adr/adr-007-profile-system-boundary.md)** accepted — data-driven profile boundary, one inheritance level (criteria 4, 5).
+- **[ADR-009](../design/adr/adr-009-install-upgrade-uninstall-ownership.md)** accepted — install/upgrade/uninstall asset-ownership + manifest (criteria 1, 3, 20).
+
+**Open-question movement:** with ADR-009 accepted, **Q7's install-ownership
+remainder is now closed** (see [`open-questions.md`](open-questions.md)); Q7 was
+already `closed (binary-selection scope only)` via ADR-002. **Signing / provenance
+is *not* closed** — ADR-009 re-defers it to a dedicated supply-chain ADR, so that
+residual supply-chain risk stays `open` in [`risks.md`](risks.md).
+
+**Validation:** `check-plan --criteria-set adr --non-interactive` deterministic
+**ADR-C1–C5 pass** on all three (C6 standing best-effort WARN); `sync-adr-index`
+clean; `GOTOOLCHAIN=local go test ./...` PASS across 8 packages; no
+`{{`/`}}`/`_TBD_`/`TODO` placeholders in the ADRs or review artifacts. No product
+code written; no accepted ADR edited in place; PR not merged.
+
+**Next step:** Oliver async-ratifies the three acceptances; the Phase 2 train
+proceeds (CI test matrix, ADR-006 transaction layer, release builds + selection,
+`init` core profile, `install` lifecycle, acceptance fixtures, closeout).
+
 ### 2026-06-30 — Knowledge layer reconciled to canonical file set
 
 Aligned `knowledge/` with the project's explicit layer spec: added
