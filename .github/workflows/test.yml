@@ -62,16 +62,18 @@ jobs:
       - name: go vet
         run: go vet ./...
 
-      - name: go test
-        run: go test ./...
-
       - name: Acceptance corpus (Phase 2 gate evidence)
         # Named, cache-defeating run of the criterion-traceable install/init
         # acceptance corpus so the Phase 2 exit gate has legible per-platform
-        # evidence (one PASS line per criterion). bash avoids pwsh quoting on
-        # the Windows leg.
+        # evidence (one PASS line per criterion). It targets only ./cmd/llm-wiki
+        # and runs BEFORE the full `go test ./...` so the acceptance evidence is
+        # produced on every leg even if an unrelated package's suite is red on
+        # that platform. bash avoids pwsh quoting on the Windows leg.
         shell: bash
         run: go test ./cmd/llm-wiki -run '^TestAcceptance' -count=1 -v
+
+      - name: go test
+        run: go test ./...
 
   cross-compile-smoke:
     name: cross-compile smoke (5 platforms)
