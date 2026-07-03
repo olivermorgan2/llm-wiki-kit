@@ -35,6 +35,14 @@ Commands:
               Use --profile <id> to select a profile (default: core) and
               --force to overwrite an existing bundle. Without --force, init
               refuses when any target file already exists (exit 3).
+  install     Install the kit's bundle into a new or non-empty repository
+              (default target: the current directory, which must already
+              exist), writing the scaffold plus a version-record manifest at
+              .llm-wiki/manifest.json through one transaction (ADR-009). Use
+              --profile <id> to select a profile (default: core), --dry-run to
+              print the full planned write set without touching the tree, and
+              --force to overwrite. Without --force, install refuses when any
+              target already exists (exit 3), losing no user file.
   validate    Validate a wiki against the OKF base and core profile. Reports
               OKF and profile findings separately at three severities
               (error/warning/suggestion). Takes an optional target directory
@@ -83,6 +91,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runVersion(stdout, jsonMode)
 	case "init":
 		return runInit(cmdArgs, stdout, stderr, jsonMode)
+	case "install":
+		return runInstall(cmdArgs, stdout, stderr, jsonMode)
 	case "validate":
 		return runValidate(cmdArgs, stdout, jsonMode)
 	case "selfcheck":
