@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -103,6 +104,41 @@ func (g *gate) commit(safe string, data []byte, perm fs.FileMode) error {
 	// rename survives power loss. Failure here does not undo the committed write.
 	_ = unix.Fsync(destFD)
 	return nil
+}
+
+// removeRegular unlinks base inside the verified parent directory safeParent.
+// It opens the real (non-symlink) directory chain from the canonical root down
+// to safeParent with openat(O_NOFOLLOW), so no swapped-in symlink parent can
+// redirect the delete, then inspects base with fstatat(AT_SYMLINK_NOFOLLOW) and
+// refuses anything that is not a regular file. The unlinkat uses flag 0 (never
+// AT_REMOVEDIR and never following base as a symlink). A missing base surfaces
+// ENOENT, which satisfies errors.Is(err, fs.ErrNotExist) for idempotent rollback.
+func (g *gate) removeRegular(safeParent, base string) error {
+	rootFD, err := unix.Openat(unix.AT_FDCWD, g.root,
+		unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	if err != nil {
+		return err
+	}
+	defer unix.Close(rootFD)
+
+	comps, err := g.relComponents(safeParent)
+	if err != nil {
+		return err
+	}
+	parentFD, err := g.openRealDirChain(rootFD, comps, false)
+	if err != nil {
+		return err
+	}
+	defer unix.Close(parentFD)
+
+	var st unix.Stat_t
+	if err := unix.Fstatat(parentFD, base, &st, unix.AT_SYMLINK_NOFOLLOW); err != nil {
+		return err // ENOENT here satisfies errors.Is(err, fs.ErrNotExist).
+	}
+	if st.Mode&unix.S_IFMT != unix.S_IFREG {
+		return fmt.Errorf("fsafe: refusing to remove non-regular file %q", base)
+	}
+	return unix.Unlinkat(parentFD, base, 0)
 }
 
 // openRealDirChain returns a file descriptor for the directory reached by

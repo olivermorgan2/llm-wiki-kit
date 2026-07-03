@@ -51,6 +51,14 @@ type Gate interface {
 	// write-to-temp + fsync + rename, so the file is never observed
 	// half-written.
 	WriteFile(path string, data []byte, perm fs.FileMode) error
+	// Remove deletes a boundary-checked regular file, routing the deletion
+	// through the same canonicalize/boundary/symlink guards as WriteFile so no
+	// mutation escapes the boundary. It refuses a non-regular target (symlink,
+	// directory, device, socket) and returns an error satisfying
+	// errors.Is(err, fs.ErrNotExist) when the target is already absent, which
+	// makes preimage-restore rollback idempotent (ADR-006). This is the delete
+	// half of the ADR-005 gate chokepoint; it adds no new write path.
+	Remove(path string) error
 }
 
 // gate is the concrete Gate confined to a single canonicalized boundary root.
@@ -201,4 +209,33 @@ func (g *gate) WriteFile(path string, data []byte, perm fs.FileMode) error {
 		return err
 	}
 	return g.commit(safe, data, perm)
+}
+
+// Remove deletes a boundary-checked regular file. It resolves and boundary-checks
+// the parent chain exactly like WriteFile (in-boundary symlink parents are
+// resolved; an escaping parent is ErrSymlinkEscape), but never follows a symlink
+// for the final component: the target is inspected without following and refused
+// if it is not a regular file. The actual unlink is performed by the
+// platform-specific removeRegular against the verified parent so the delete
+// cannot be redirected outside the boundary. See removeRegular in
+// fsafe_unix.go / fsafe_other.go.
+func (g *gate) Remove(path string) error {
+	cand := path
+	if !filepath.IsAbs(cand) {
+		cand = filepath.Join(g.root, cand)
+	}
+	cand = filepath.Clean(cand)
+	if !g.within(cand) {
+		return ErrOutsideBoundary
+	}
+	if cand == g.root {
+		return fmt.Errorf("fsafe: refusing to remove the boundary root %q", g.root)
+	}
+	// Resolve the parent (following in-boundary symlinks, rejecting escapes) but
+	// keep the final component literal so a symlinked target is not followed.
+	safeParent, err := g.Resolve(filepath.Dir(cand))
+	if err != nil {
+		return err
+	}
+	return g.removeRegular(safeParent, filepath.Base(cand))
 }
