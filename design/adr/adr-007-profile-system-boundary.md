@@ -30,10 +30,13 @@ Constraints already set by accepted artifacts and addenda:
   per-type valid/invalid fixtures) — the profile format must express exactly
   that, no more.
 - [Addendum 005](../prd-addenda/005-custom-profile-boundary.md) and open
-  question **Q5** scope third-party **profile registry + trust** to Phase 3;
-  the MVP custom-profile surface is **local-file only**. Profiles must therefore
-  be declarative **data**, not code, so that trusting one later is a data-review
-  problem, not a code-execution problem.
+  question **Q5** split the custom-profile surface across two later phases:
+  **Phase 3** owns the third-party **profile registry + trust** question — its
+  decision or continued deferral — and **Phase 7** owns the **local-path
+  custom-profile implementation** itself, if still in MVP scope. The MVP
+  custom-profile surface is **local-file only**; no registry is exercised before
+  Phase 3. Profiles must therefore be declarative **data**, not code, so that
+  trusting one later is a data-review problem, not a code-execution problem.
 - Risk (`knowledge/risks.md`): "custom-profile complexity becomes a programming
   language" and "schema becomes rigid too early" — both push toward minimal,
   declarative, shallow composition.
@@ -111,10 +114,13 @@ profile invites drift and blurs the OKF/profile line criterion 5 protects.
   and the loader's exclusive use of the ADR-001 adapter.
 - Deferred / validation implications: criterion 4 is proved incrementally —
   **core** in Phase 2 (`init` + `validate` clean), **academic-research** in
-  Phase 4, **custom/local-path** in Phase 7; criterion 5 is proved by the
-  ADR-004 engine over these profiles. Third-party profile **registry/trust**
-  stays deferred to Phase 3 (Q5, addendum 005); the profile **format** is fixed
-  here so that deferral changes only resolution, not the data model. The
+  Phase 4, and **local-path custom profiles** in Phase 7; criterion 5 is proved
+  by the ADR-004 engine over these profiles. The two deferrals are distinct:
+  **Phase 3** owns the third-party profile **registry/trust** decision (or its
+  continued deferral), while **Phase 7** owns the **local-path custom-profile
+  implementation** on the seam reserved here (Q5, addendum 005). The profile
+  **format** is fixed here so that neither deferral changes the data model —
+  only resolution. The
   "schema too rigid too early" and "custom-profile becomes a language" risks in
   `knowledge/risks.md` stay `open`, now bounded by the declarative one-level
   model.
