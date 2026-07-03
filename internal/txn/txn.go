@@ -279,10 +279,10 @@ func isReservedTarget(cleaned string) bool {
 
 // --- staging layout helpers ---
 
-func (t *Txn) txnDirRel() string          { return filepath.Join(stagingRootRel, t.id) }
-func (t *Txn) manifestRel() string        { return filepath.Join(t.txnDirRel(), "manifest.json") }
-func (t *Txn) stagedRel(i int) string     { return filepath.Join(t.txnDirRel(), "files", pad4(i)) }
-func (t *Txn) preimageSetRel() string     { return filepath.Join(t.txnDirRel(), "preimages.json") }
+func (t *Txn) txnDirRel() string      { return filepath.Join(stagingRootRel, t.id) }
+func (t *Txn) manifestRel() string    { return filepath.Join(t.txnDirRel(), "manifest.json") }
+func (t *Txn) stagedRel(i int) string { return filepath.Join(t.txnDirRel(), "files", pad4(i)) }
+func (t *Txn) preimageSetRel() string { return filepath.Join(t.txnDirRel(), "preimages.json") }
 func (t *Txn) preimageBlobRel(s string) string {
 	return filepath.Join(t.txnDirRel(), "preimages", s)
 }

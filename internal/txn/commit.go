@@ -16,17 +16,17 @@ type stepOpKind int
 
 const (
 	opCapturePreimage  stepOpKind = iota // about to capture the preimage for entry Index
-	opPreimagesDone                       // about to write preimages.json (capture barrier)
-	opIntent                              // about to write journal/intent
-	opCommitStep                          // about to write target for entry Index
-	opStepMarker                          // about to write journal/step-Index
-	opCommitted                           // about to write journal/committed
-	opCleanupManifest                     // about to remove the manifest (cleanup start)
-	opCleanupRemoveAll                    // about to RemoveAll the staging dir
-	opRBIntent                            // about to write journal/rb-intent
-	opRBRestore                           // about to restore the preimage for entry Index
-	opRBStepMarker                        // about to write journal/rb-step-Index
-	opRolledBack                          // about to write journal/rolled-back
+	opPreimagesDone                      // about to write preimages.json (capture barrier)
+	opIntent                             // about to write journal/intent
+	opCommitStep                         // about to write target for entry Index
+	opStepMarker                         // about to write journal/step-Index
+	opCommitted                          // about to write journal/committed
+	opCleanupManifest                    // about to remove the manifest (cleanup start)
+	opCleanupRemoveAll                   // about to RemoveAll the staging dir
+	opRBIntent                           // about to write journal/rb-intent
+	opRBRestore                          // about to restore the preimage for entry Index
+	opRBStepMarker                       // about to write journal/rb-step-Index
+	opRolledBack                         // about to write journal/rolled-back
 )
 
 // stepOp identifies a single mutating operation for hook injection and the
