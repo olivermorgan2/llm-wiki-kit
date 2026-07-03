@@ -1,0 +1,115 @@
+name: CI
+
+# Repo-development CI for llm-wiki-kit: build, vet, and test the Go engine on
+# every one of the five ADR-002 target platforms as far as GitHub-hosted
+# runners support them, plus a cross-compile + checksum smoke that proves all
+# five binaries build and gen-checksums produces a manifest.
+#
+# Scope: repo-dev CI only. This is deliberately NOT the shipped user-facing
+# conformance workflow (Phase 6, ADR-011) and does no release publishing,
+# signing, or provenance.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Pin to the go.mod toolchain; never silently download a different one.
+  GOTOOLCHAIN: local
+
+jobs:
+  test:
+    name: test (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      # Report every platform even when one fails; a red macOS run must not
+      # hide a Windows regression.
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-arm64
+            runner: macos-14
+          - name: macos-amd64
+            runner: macos-13
+          - name: linux-amd64
+            runner: ubuntu-24.04
+          - name: linux-arm64
+            runner: ubuntu-24.04-arm
+          - name: windows-amd64
+            runner: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: false
+
+      - name: go build
+        run: go build ./...
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test ./...
+
+  cross-compile-smoke:
+    name: cross-compile smoke (5 platforms)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: false
+
+      - name: Cross-compile all five target binaries
+        shell: bash
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          # Keys mirror internal/platform.Platform.ArtifactPath:
+          # bin/<goos>_<goarch>/llm-wiki[.exe].
+          targets=("darwin amd64" "darwin arm64" "linux amd64" "linux arm64" "windows amd64")
+          for t in "${targets[@]}"; do
+            read -r goos goarch <<<"$t"
+            out="bin/${goos}_${goarch}/llm-wiki"
+            [ "$goos" = "windows" ] && out="${out}.exe"
+            echo "building $out"
+            GOOS="$goos" GOARCH="$goarch" go build -o "$out" ./cmd/llm-wiki
+          done
+
+      - name: Generate checksum manifest (smoke)
+        run: go run ./cmd/gen-checksums -root .
+
+      - name: Verify manifest lists all five platforms
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=$(grep -c . bin/SHA256SUMS)
+          echo "manifest entries: $count"
+          test "$count" -eq 5
+          cat bin/SHA256SUMS
+
+      - name: Upload cross-compiled bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-compiled-bundle
+          path: bin/
+          retention-days: 7
