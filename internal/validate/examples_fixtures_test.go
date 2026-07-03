@@ -24,7 +24,7 @@ const (
 // one finding whose Code is listed here. The invalid/README.md mirrors this map
 // for humans.
 var invalidFixtureCodes = map[string]string{
-	"malformed-yaml.md":      codeOKFYAMLParse,   // criterion 7
+	"malformed-yaml.md":      CodeYAMLParse,      // criterion 7
 	"missing-type.md":        codeOKFTypePresent, // criteria 5, 7
 	"missing-title.md":       codeCoreReqTitle,   // criteria 5, 7
 	"missing-description.md": codeCoreReqDesc,    // criterion 7

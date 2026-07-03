@@ -71,16 +71,34 @@ type Approval struct {
 	Paths    []string `json:"paths,omitempty"`
 }
 
+// PageReport is the read-only page report an inspect-style page operation
+// carries in the envelope. It records the page's bundle-relative path, whether
+// its frontmatter parsed, and the content hash (lowercase-hex SHA-256, no
+// prefix) — the base-hash input a later ADR-006 page plan/apply binds against.
+// It is an operation-scoped payload: present only for page commands, nil (and
+// omitted from JSON) everywhere else, so the six ADR-003 fields remain the
+// invariant shape.
+type PageReport struct {
+	Path        string `json:"path"`
+	Parsed      bool   `json:"parsed"`
+	ContentHash string `json:"contentHash"`
+}
+
 // Envelope is the versioned response shape shared by every surface. It always
 // carries exactly the six ADR-003 fields: contractVersion, operation, status,
-// findings, affectedPaths, approval.
+// findings, affectedPaths, approval. Page-scoped operations additionally carry
+// an optional seventh field, page, which is nil (and omitted from JSON) for
+// every non-page operation, so the six-field shape is preserved everywhere
+// else (ADR-006 anticipates the envelope carrying page-plan payloads; this is
+// the first, read-only slot).
 type Envelope struct {
-	ContractVersion string    `json:"contractVersion"`
-	Operation       string    `json:"operation"`
-	Status          Status    `json:"status"`
-	Findings        []Finding `json:"findings"`
-	AffectedPaths   []string  `json:"affectedPaths"`
-	Approval        *Approval `json:"approval"`
+	ContractVersion string      `json:"contractVersion"`
+	Operation       string      `json:"operation"`
+	Status          Status      `json:"status"`
+	Findings        []Finding   `json:"findings"`
+	AffectedPaths   []string    `json:"affectedPaths"`
+	Approval        *Approval   `json:"approval"`
+	Page            *PageReport `json:"page,omitempty"`
 }
 
 // New returns an envelope stamped with the current contract version for the

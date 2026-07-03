@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/olivermorgan2/llm-wiki-kit/internal/contract"
+	"github.com/olivermorgan2/llm-wiki-kit/internal/fsafe"
+	"github.com/olivermorgan2/llm-wiki-kit/internal/plan"
 	"github.com/olivermorgan2/llm-wiki-kit/internal/platform"
 	"github.com/olivermorgan2/llm-wiki-kit/internal/profile"
 	"github.com/olivermorgan2/llm-wiki-kit/internal/scaffold"
@@ -49,6 +51,15 @@ Commands:
               (default: the current directory). Set LLM_WIKI_SEVERITY to a
               comma-separated list of code=severity pairs (e.g.
               core-broken-link=error) to promote/demote a rule's severity.
+  page inspect
+              Report a single page without mutating it. Reads the page at
+              <path> (relative to --root, default the current directory, or an
+              absolute path contained by it) and reports its parse status,
+              validation findings, and content hash (lowercase-hex SHA-256).
+              Findings are identical to those validate reports for the same
+              page; LLM_WIKI_SEVERITY overrides apply as with validate. The
+              path must resolve to a regular .md file inside the bundle
+              boundary; a path escaping the boundary is refused (exit 5).
   selfcheck   Verify this platform's shipped binary against its bundled
               checksum (ADR-002). Use --root <dir> to point at the bundle;
               defaults to the directory containing the running executable.
@@ -95,6 +106,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runInstall(cmdArgs, stdout, stderr, jsonMode)
 	case "validate":
 		return runValidate(cmdArgs, stdout, jsonMode)
+	case "page":
+		return runPage(cmdArgs, stdout, stderr, jsonMode)
 	case "selfcheck":
 		return runSelfcheck(cmdArgs, stdout, stderr, jsonMode)
 	default:
@@ -335,6 +348,106 @@ func runValidate(args []string, stdout io.Writer, jsonMode bool) int {
 	}
 	fmt.Fprintf(stdout, "validate: %s — %d finding(s)\n", status, len(findings))
 	for _, f := range findings {
+		fmt.Fprintf(stdout, "  [%s/%s] %s: %s (%s)\n", f.Ruleset, f.Severity, f.Code, f.Message, f.Path)
+	}
+	return int(contract.ExitCodeForStatus(env.Status))
+}
+
+// runPage dispatches the page command group (ADR-006). Issue #42 lands the
+// read-only inspect subcommand; page plan/apply arrive in later slices. An
+// empty or unknown subcommand is invalid-invocation (exit 4), matching the
+// unknown-profile precedent in runInit. The operation string is the
+// space-separated invocation ("page inspect"), the convention every Phase 3
+// page subcommand follows.
+func runPage(args []string, stdout, stderr io.Writer, jsonMode bool) int {
+	if len(args) == 0 {
+		return cmdInvalid("page", stdout, stderr, jsonMode, "page requires a subcommand (inspect)")
+	}
+	sub, subArgs := args[0], args[1:]
+	switch sub {
+	case "inspect":
+		return runPageInspect(subArgs, stdout, stderr, jsonMode)
+	default:
+		return cmdInvalid("page", stdout, stderr, jsonMode, fmt.Sprintf("unknown page subcommand %q", sub))
+	}
+}
+
+// runPageInspect reports a single page read-only. It parses its own flags in the
+// hand-rolled selfcheckRoot/runInit style (the global loop only strips --json):
+// --root/--root=<dir> (default "."), exactly one positional <path>. It maps the
+// plan substrate's outcomes to the contract: a boundary escape is a system
+// failure (exit 5, per fsafe's documented "every guard error → system-failure"
+// rule), while a missing page, a non-.md path, or a bad invocation is
+// invalid-invocation (exit 4). On success it emits the standard envelope plus
+// the optional page payload carrying path/parse-status/content-hash.
+func runPageInspect(args []string, stdout, stderr io.Writer, jsonMode bool) int {
+	root := "."
+	var pagePath string
+	havePath := false
+
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--root" || a == "-root":
+			if i+1 >= len(args) {
+				return cmdInvalid("page inspect", stdout, stderr, jsonMode, "--root requires a value")
+			}
+			i++
+			root = args[i]
+		case strings.HasPrefix(a, "--root="):
+			root = strings.TrimPrefix(a, "--root=")
+		case strings.HasPrefix(a, "-root="):
+			root = strings.TrimPrefix(a, "-root=")
+		case strings.HasPrefix(a, "-"):
+			return cmdInvalid("page inspect", stdout, stderr, jsonMode, fmt.Sprintf("unknown flag %q", a))
+		default:
+			if havePath {
+				return cmdInvalid("page inspect", stdout, stderr, jsonMode, fmt.Sprintf("unexpected argument %q", a))
+			}
+			pagePath = a
+			havePath = true
+		}
+	}
+
+	if !havePath {
+		return cmdInvalid("page inspect", stdout, stderr, jsonMode, "page inspect requires a <path> argument")
+	}
+
+	report, err := plan.Inspect(root, pagePath, yamladapter.New(), severityOverrides(os.Getenv("LLM_WIKI_SEVERITY")))
+	if err != nil {
+		switch {
+		case errors.Is(err, plan.ErrPageNotFound):
+			return cmdInvalid("page inspect", stdout, stderr, jsonMode, fmt.Sprintf("no page at %q", pagePath))
+		case errors.Is(err, plan.ErrNotMarkdown):
+			return cmdInvalid("page inspect", stdout, stderr, jsonMode, fmt.Sprintf("%q is not a markdown page", pagePath))
+		case errors.Is(err, fsafe.ErrOutsideBoundary), errors.Is(err, fsafe.ErrSymlinkEscape):
+			// Boundary escape maps to system-failure per fsafe's documented rule.
+			return cmdSystemFailure("page inspect", stdout, stderr, jsonMode, err)
+		default:
+			return cmdSystemFailure("page inspect", stdout, stderr, jsonMode, err)
+		}
+	}
+
+	env := contract.New("page inspect", report.Status)
+	env.Findings = report.Findings
+	env.Page = &contract.PageReport{
+		Path:        report.Path,
+		Parsed:      report.Parsed,
+		ContentHash: report.ContentHash,
+	}
+
+	if jsonMode {
+		return emit(stdout, env)
+	}
+	parseState := "ok"
+	if !report.Parsed {
+		parseState = "failed"
+	}
+	fmt.Fprintf(stdout, "page inspect: %s — %s\n", report.Status, report.Path)
+	fmt.Fprintf(stdout, "  parse: %s\n", parseState)
+	fmt.Fprintf(stdout, "  hash:  sha256 %s\n", report.ContentHash)
+	fmt.Fprintf(stdout, "  %d finding(s)\n", len(report.Findings))
+	for _, f := range report.Findings {
 		fmt.Fprintf(stdout, "  [%s/%s] %s: %s (%s)\n", f.Ruleset, f.Severity, f.Code, f.Message, f.Path)
 	}
 	return int(contract.ExitCodeForStatus(env.Status))
