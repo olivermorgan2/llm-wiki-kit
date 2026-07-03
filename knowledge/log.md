@@ -517,6 +517,60 @@ manually (state=closed, 9 closed / 0 open, 2026-07-03).
 **ADR-008 (provenance/citation) must be drafted + accepted before Phase 3**
 authoring work; then Phase 3 issues.
 
+### 2026-07-03 — ADR-008 (provenance & citation model) drafted, Codex-gated, accepted
+
+Drafted [ADR-008](../design/adr/adr-008-provenance-and-citation-model.md) — the
+Phase 3 provenance/citation prerequisite (issue **#32**) — on branch
+`docs/adr-008-provenance-citation-model`, filling the deliberately-preserved 008
+numbering gap. **Decision (Option A):** citations are **ordinary inline Markdown
+links** `[label](target)` (the grammar `internal/validate/links.go` already
+parses); evidentiary status comes from a **profile-designated evidence context**
+(no new syntax, no frontmatter registry, no micro-syntax parser); "resolvable"
+is a **total, deterministic, offline** three-class predicate (http(s) syntactic
+validity / in-bundle membership via the shipped `resolveTarget` / repo-path
+read-only `stat`) sharing **one resolver** with `core-broken-link`;
+sourced-ness is asserted **structurally** (profile data, per addendum 003) plus
+**procedurally** (adapter contract, criterion-9 fixtures) — the engine never
+infers authorship; severities live inside [ADR-004](../design/adr/adr-004-validation-and-severity-model.md)'s
+precedence; preservation is [ADR-001](../design/adr/adr-001-go-toolchain-and-yaml.md)/[ADR-006](../design/adr/adr-006-staged-mutation-transaction-model.md)
+byte mechanics **plus a plan-time citation-loss gate ADR-008 owns**, routed
+through the **existing [ADR-003](../design/adr/adr-003-json-contract-and-exit-codes.md)
+`approval` member** (no envelope change). Rejected a frontmatter `citations:`
+registry (B: can't express section-scoped rules, severs claim/evidence
+adjacency, duplicates `resource`) and a citation micro-syntax (C: needs a
+deferred parser, "citation theatre").
+
+**Codex gate (Hermes `openai-codex` provider fallback; standalone codex CLI
+unavailable):**
+
+- **Loop 1 — `NEEDS_REVISION` (3/5)** ([archive](reviews/2026-07-03-codex-adr-008-review.md)):
+  four decision-level blockers — (B1) preservation falsely attributed an
+  approval-on-deletion discipline to ADR-006 (which gates only on stale hashes);
+  (B2) the three resolution classes didn't partition the grammar (fragment-only,
+  protocol-relative, invalid-host http(s) fell between codes); (B3)
+  `profile-citation-unresolved` double-counted a condition ADR-004 models as a
+  severity promotion; (B4) the ruleset tag was undecided and contradicted by the
+  shipped enum (`okf`/`profile` only) and `core-broken-link`'s `RulesetProfile`
+  tag. All four addressed while keeping `proposed`.
+- **Loop 2 — `READY` (5/5)** ([archive](reviews/2026-07-03-codex-adr-008-rereview.md)):
+  all four blockers **fixed** at the mechanism level (verified against the
+  accepted ADRs + shipped `internal/contract`/`links.go`), all four non-blocking
+  items folded, **no new blockers**. Two carry-ins recorded for the Phase 3/4
+  implementation issues (gate class 3 on `isIntraWiki`; define whether
+  present-but-unresolved satisfies a require-citation obligation).
+
+Flipped `proposed` → **`accepted`** under the **2026-07-03 autonomous-phase
+mandate**, **flagged for Oliver's async ratification** (matching ADR-006/007/009);
+re-ran `sync-adr-index` (008 now `accepted` between 007 and 009). **Phase 3
+authoring is unblocked.** Scope note: ADR-008 covers **content-provenance**
+(citations); **supply-chain provenance** (release signing/attestation) is a
+**separate deferred ADR** — not conflated — so that residual risk and the
+"sourced claims lose provenance" risk stay `open` in [`risks.md`](risks.md), the
+latter now with its mechanism decided. Validation: `check-plan` ADR-C1–C5 PASS
+(C6 WARN); `go build`/`vet`/`test ./...` green (11 packages); placeholder scan
+clean. Next: **file Phase 3 issues** (`page inspect`/`plan`/`apply` + authoring
+adapter).
+
 ### 2026-06-30 — Knowledge layer reconciled to canonical file set
 
 Aligned `knowledge/` with the project's explicit layer spec: added

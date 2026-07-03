@@ -8,9 +8,14 @@ _Last updated: 2026-07-03_
   #31 merged (`main` = `30cfbac`), closing issue #21 and dropping milestone #2
   (`Phase 2 — Install/init`) to zero open issues; Hermes then closed the
   milestone manually (state=closed, 9 closed / 0 open, closed 2026-07-03).
-  Oliver's async ratification of ADR-006/007/009 remains the one outstanding
-  flag — not a merge blocker.
-- **Next phase: Phase 3 / Authoring + staged mutation.**
+  Oliver's async ratification of ADR-006/007/009 **and now ADR-008** remains the
+  one outstanding flag — not a merge blocker.
+- **Phase 3 prerequisite done: ADR-008 (provenance & citation model) accepted**
+  2026-07-03 (issue #32, Codex `READY` 5/5, same mandate/flag). Phase 3
+  authoring is unblocked.
+- **Next phase: Phase 3 / Authoring + staged mutation** — file the Phase 3
+  issues (`page inspect`/`plan`/`apply`, authoring adapter, provenance/citation
+  fixtures).
 
 ## Phase 2 / Install-init — complete
 
@@ -159,9 +164,15 @@ through the staged, preview-before-write workflow (`page inspect` / `page plan`
 
 **ADR dependency note:** ADR-006 (staged mutation) is accepted — Phase 3
 consumes its `inspect/plan/apply` UX + hash-bound stale-plan rejection half.
-**ADR-008 (provenance / citation resolution) must be drafted and accepted
-before Phase 3 authoring work** — it is the next-needed ADR (still a candidate
-in the build-out plan; the `design/adr/` index preserves the 008 gap).
+**ADR-008 (provenance & citation model) is now drafted and accepted**
+(2026-07-03, issue #32, branch `docs/adr-008-provenance-citation-model`; Codex
+`READY` 5/5 under the autonomous-phase mandate, flagged for Oliver's async
+ratification; the `design/adr/` index 008 gap is filled). Phase 3 authoring is
+**unblocked**. Phase 3 consumes ADR-008's core mechanism (context-based
+citations, the total offline three-class resolver, the plan-time
+citation-loss/`approval` gate) plus the criterion-9 fixtures; Phase 4 consumes
+its profile citation vocabulary. Next: **file Phase 3 issues** (`page
+inspect`/`plan`/`apply` + authoring adapter + provenance/citation fixtures).
 
 ## Notes / deferrals
 
