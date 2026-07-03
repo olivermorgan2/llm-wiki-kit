@@ -12,7 +12,12 @@ import (
 // Rule codes. These are the stable identifiers carried by each finding and used
 // to build its fingerprint; the concrete set is fixed for this issue (ADR-004).
 const (
-	codeOKFYAMLParse    = "okf-yaml-parse"
+	// CodeYAMLParse is the never-suppressible parse-failure rule code (ADR-004):
+	// a page whose frontmatter is missing, unterminated, or unparseable yields
+	// exactly this OKF finding and no others. It is exported so callers can
+	// detect parse status without re-parsing (e.g. page inspect's Parsed flag).
+	CodeYAMLParse = "okf-yaml-parse"
+
 	codeOKFTypePresent  = "okf-type-present"
 	codeCoreReqTitle    = "core-required-title"
 	codeCoreReqDesc     = "core-required-description"
@@ -53,7 +58,7 @@ func parseFailure(path string, err error) contract.Finding {
 	return contract.Finding{
 		Ruleset:  contract.RulesetOKF,
 		Severity: contract.SeverityError,
-		Code:     codeOKFYAMLParse,
+		Code:     CodeYAMLParse,
 		Message:  "frontmatter YAML does not parse: " + err.Error(),
 		Path:     path,
 	}

@@ -9,7 +9,7 @@ import (
 func fp(f contract.Finding) string { return Fingerprint(f) }
 
 func parseErr(path string) contract.Finding {
-	return contract.Finding{Ruleset: contract.RulesetOKF, Severity: contract.SeverityError, Code: codeOKFYAMLParse, Path: path}
+	return contract.Finding{Ruleset: contract.RulesetOKF, Severity: contract.SeverityError, Code: CodeYAMLParse, Path: path}
 }
 func missingTitle(path string) contract.Finding {
 	return contract.Finding{Ruleset: contract.RulesetProfile, Severity: contract.SeverityError, Code: codeCoreReqTitle, Path: path}

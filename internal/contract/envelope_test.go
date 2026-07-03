@@ -34,6 +34,56 @@ func TestNewEnvelopeCarriesAllSixContractFields(t *testing.T) {
 	}
 }
 
+// The optional page payload is omitted entirely when nil: a non-page envelope
+// still serializes exactly the six ADR-003 fields, never a seventh "page" key.
+func TestNonPageEnvelopeOmitsPageField(t *testing.T) {
+	env := New("validate", StatusSuccess)
+
+	var buf bytes.Buffer
+	if err := env.WriteJSON(&buf); err != nil {
+		t.Fatalf("WriteJSON: %v", err)
+	}
+
+	var generic map[string]json.RawMessage
+	if err := json.Unmarshal(buf.Bytes(), &generic); err != nil {
+		t.Fatalf("emitted JSON does not parse: %v\n%s", err, buf.String())
+	}
+	if _, ok := generic["page"]; ok {
+		t.Errorf("non-page envelope must omit the page field; got: %s", buf.String())
+	}
+	if len(generic) != 6 {
+		t.Errorf("non-page envelope must carry exactly 6 fields, got %d: %s", len(generic), buf.String())
+	}
+}
+
+// A page-scoped envelope carries the six core fields plus exactly one optional
+// seventh field, page, and nothing else.
+func TestPageEnvelopeCarriesSevenFields(t *testing.T) {
+	env := New("page inspect", StatusSuccess)
+	env.Page = &PageReport{Path: "wiki/index.md", Parsed: true, ContentHash: "abc123"}
+
+	var buf bytes.Buffer
+	if err := env.WriteJSON(&buf); err != nil {
+		t.Fatalf("WriteJSON: %v", err)
+	}
+
+	var generic map[string]json.RawMessage
+	if err := json.Unmarshal(buf.Bytes(), &generic); err != nil {
+		t.Fatalf("emitted JSON does not parse: %v\n%s", err, buf.String())
+	}
+	for _, field := range []string{
+		"contractVersion", "operation", "status",
+		"findings", "affectedPaths", "approval", "page",
+	} {
+		if _, ok := generic[field]; !ok {
+			t.Errorf("page envelope JSON is missing field %q; got: %s", field, buf.String())
+		}
+	}
+	if len(generic) != 7 {
+		t.Errorf("page envelope must carry exactly 7 fields, got %d: %s", len(generic), buf.String())
+	}
+}
+
 func TestNewEnvelopeDefaults(t *testing.T) {
 	env := New("validate", StatusSuccess)
 

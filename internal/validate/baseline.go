@@ -46,7 +46,7 @@ func ApplyBaseline(findings []contract.Finding, base Baseline, releaseGate bool)
 // keepUnderBaseline reports whether a finding survives the baseline filter.
 func keepUnderBaseline(f contract.Finding, base Baseline, releaseGate bool) bool {
 	// Parse errors are the never-suppressible boundary case.
-	if f.Code == codeOKFYAMLParse {
+	if f.Code == CodeYAMLParse {
 		return true
 	}
 	// A finding is a suppression candidate only if the baseline records it.
