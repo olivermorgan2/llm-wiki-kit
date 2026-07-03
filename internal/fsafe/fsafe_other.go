@@ -75,6 +75,28 @@ func (g *gate) commit(safe string, data []byte, perm fs.FileMode) error {
 	return nil
 }
 
+// removeRegular unlinks base inside the verified parent directory safeParent on
+// the non-unix fallback. It revalidates the parent chain as real (non-symlink)
+// directories, inspects base with a non-following Lstat, refuses anything that is
+// not a regular file, and then os.Removes it. A missing base surfaces an error
+// satisfying errors.Is(err, fs.ErrNotExist). Like the fallback commit, this does
+// not fully close the concurrent check/use window that the unix fd-relative path
+// closes; that residual is accepted because unix is the primary engine target.
+func (g *gate) removeRegular(safeParent, base string) error {
+	if err := g.assertRealDirChain(safeParent); err != nil {
+		return err
+	}
+	target := filepath.Join(safeParent, base)
+	info, err := os.Lstat(target)
+	if err != nil {
+		return err // ErrNotExist here satisfies errors.Is(err, fs.ErrNotExist).
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("fsafe: refusing to remove non-regular file %q", target)
+	}
+	return os.Remove(target)
+}
+
 // mkdirRealChain creates dir by walking from the canonical root and ensuring
 // every component is a real (non-symlink) directory, creating missing ones with
 // a non-following os.Mkdir. It rejects with ErrSymlinkEscape the moment a

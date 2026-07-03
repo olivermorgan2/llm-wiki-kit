@@ -2,6 +2,7 @@ package fsafe
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -272,6 +273,120 @@ func TestWriteFileFailureLeavesDestinationIntact(t *testing.T) {
 			names = append(names, e.Name())
 		}
 		t.Fatalf("leftover temp files in staging: %s", strings.Join(names, ", "))
+	}
+}
+
+// --- Remove: deletes a boundary-checked regular file ---
+
+// TestRemoveDeletesRegularFile confirms the Remove primitive deletes a regular
+// file inside the boundary (the rollback path relies on it to restore absence).
+func TestRemoveDeletesRegularFile(t *testing.T) {
+	root := t.TempDir()
+	g := newGate(t, root)
+
+	target := filepath.Join(canonRoot(t, root), "docs", "a.md")
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatalf("mkdir parent: %v", err)
+	}
+	if err := os.WriteFile(target, []byte("bye"), 0o600); err != nil {
+		t.Fatalf("seed target: %v", err)
+	}
+
+	if err := g.Remove("docs/a.md"); err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatalf("target still present after Remove: stat err = %v", err)
+	}
+}
+
+// TestRemoveMissingIsNotExist ensures removing an absent target yields an error
+// that is fs.ErrNotExist, so resumable rollback can treat it as idempotent.
+func TestRemoveMissingIsNotExist(t *testing.T) {
+	root := t.TempDir()
+	g := newGate(t, root)
+
+	err := g.Remove("never-existed.txt")
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("Remove(missing) err = %v, want fs.ErrNotExist", err)
+	}
+}
+
+// TestRemoveRejectsTraversal ensures a "../" escape is refused, deleting nothing.
+func TestRemoveRejectsTraversal(t *testing.T) {
+	root := t.TempDir()
+	g := newGate(t, root)
+
+	if err := g.Remove("../outside.txt"); !errors.Is(err, ErrOutsideBoundary) {
+		t.Fatalf("Remove(traversal) err = %v, want ErrOutsideBoundary", err)
+	}
+}
+
+// TestRemoveRejectsSymlinkEscape ensures a symlink parent that escapes the
+// boundary is refused and the external target is left intact.
+func TestRemoveRejectsSymlinkEscape(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	g := newGate(t, root)
+
+	loot := filepath.Join(outside, "loot.txt")
+	if err := os.WriteFile(loot, []byte("keep"), 0o600); err != nil {
+		t.Fatalf("seed loot: %v", err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "link")); err != nil {
+		t.Fatalf("Symlink: %v", err)
+	}
+
+	if err := g.Remove("link/loot.txt"); !errors.Is(err, ErrSymlinkEscape) {
+		t.Fatalf("Remove through escaping symlink err = %v, want ErrSymlinkEscape", err)
+	}
+	if _, err := os.Stat(loot); err != nil {
+		t.Fatalf("external target disturbed by Remove: %v", err)
+	}
+}
+
+// TestRemoveRejectsDirectory ensures a directory target is refused (transactions
+// commit and roll back only regular files, per ADR-006).
+func TestRemoveRejectsDirectory(t *testing.T) {
+	root := t.TempDir()
+	g := newGate(t, root)
+
+	dir := filepath.Join(canonRoot(t, root), "d")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := g.Remove("d"); err == nil {
+		t.Fatal("Remove(dir) = nil error, want error")
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Fatalf("directory disturbed by refused Remove: %v", err)
+	}
+}
+
+// TestRemoveRejectsSymlinkTarget ensures a symlink as the final component is
+// refused as non-regular, and neither the link nor its target is removed.
+func TestRemoveRejectsSymlinkTarget(t *testing.T) {
+	root := t.TempDir()
+	g := newGate(t, root)
+
+	canon := canonRoot(t, root)
+	real := filepath.Join(canon, "real.txt")
+	if err := os.WriteFile(real, []byte("x"), 0o600); err != nil {
+		t.Fatalf("seed real: %v", err)
+	}
+	link := filepath.Join(canon, "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatalf("Symlink: %v", err)
+	}
+
+	if err := g.Remove("link"); err == nil {
+		t.Fatal("Remove(symlink target) = nil error, want error")
+	}
+	if _, err := os.Lstat(link); err != nil {
+		t.Fatalf("symlink removed by refused Remove: %v", err)
+	}
+	if _, err := os.Stat(real); err != nil {
+		t.Fatalf("symlink target removed by refused Remove: %v", err)
 	}
 }
 
