@@ -1,67 +1,176 @@
 # Project State
 
-_Last updated: 2026-07-02_
+_Last updated: 2026-07-03_
 
 ## Current status
 
-- **Phase 1 / Foundation: complete.**
-- **Next phase: Phase 2 / Install-init.**
+- **Phase 2 / Install-init: complete** (pending milestone close on merge of this
+  PR, and Oliver's async ratification of ADR-006/007/009).
+- **Next phase: Phase 3 / Authoring + staged mutation.**
 
-## Phase 1 / Foundation — complete
+## Phase 2 / Install-init — complete
 
-Foundation delivered the deterministic `llm-wiki` CLI spine: versioned JSON
-contract, platform/artifact verification, core-profile validation with a
-three-severity model, broken-link detection, a mandatory safe-filesystem
-gate, and the core-profile + security acceptance fixtures.
+Phase 2 made the kit installable. It landed the three ADR prerequisites
+(ADR-006 cross-file transaction model, ADR-007 profile-system boundary, ADR-009
+install/upgrade/uninstall ownership), then built on them: the `internal/txn`
+cross-file transaction commit over the `internal/fsafe` staging area (ADR-006);
+`llm-wiki init` with the core profile + wiki bundle scaffold (ADR-007); the
+`install` lifecycle for new and non-empty repos with `--dry-run`, silent-
+overwrite refusal, and a `.llm-wiki/manifest.json` version record (ADR-009);
+multi-platform release builds + selection wiring with a per-platform selfcheck
+smoke (ADR-002); a five-platform CI test matrix; and a named, criterion-mapped
+install/init acceptance corpus that serves as the Phase 2 gate evidence.
 
 ### Issues (all closed)
 
 | Issue | Title | ADR |
 |-------|-------|-----|
-| #1 | Scaffold deterministic `llm-wiki` CLI skeleton + versioned JSON-contract spine | ADR-001, ADR-003 |
-| #2 | OS/arch detection + release-artifact checksum verification | ADR-002 |
-| #3 | Core-profile validate: OKF-vs-profile reporting at three severities | ADR-004 |
-| #4 | Broken-link detection at configured severity | ADR-004 |
-| #5 | Safe filesystem layer: atomic writes, bounded scope, symlink/path-traversal rejection | ADR-005 |
-| #6 | Core-profile fixtures + security testdata: traversal/symlink | ADR-004, ADR-005 |
+| #14 | Draft + accept ADR-006/007/009 — Phase 2 architectural prerequisites | ADR-006, ADR-007, ADR-009 |
+| #16 | Cross-file transaction commit on the fsafe staging area | ADR-006 |
+| #18 | `llm-wiki init` with the core profile + wiki bundle scaffold | ADR-007 |
+| #19 | Install into new + non-empty repos: `--dry-run`, overwrite refusal, version record | ADR-009 |
+| #15 | Stand up cross-platform CI test matrix (5 platforms) | — |
+| #20 | New-repo + non-empty-repo install/init acceptance corpus | ADR-002, ADR-003, ADR-005, ADR-006, ADR-009 |
+| #17 | Multi-platform release builds + selection shim wiring | ADR-002 |
+| #21 | Phase 2 closeout state and knowledge update | — (this PR) |
 
-### PRs (all merged)
+### PRs (all merged; closeout PR open)
 
-| PR | Merged | Closes |
-|----|--------|--------|
-| #7 | 2026-07-01 | #1 |
-| #8 | 2026-07-01 | #2 |
-| #9 | 2026-07-01 | #3 |
-| #10 | 2026-07-01 | #4 |
-| #11 | 2026-07-01 | #5 |
-| #12 | 2026-07-01 | #6 |
+| PR | Merged | Closes | Merge commit |
+|----|--------|--------|--------------|
+| #22 | 2026-07-03 | #14 | `4136e70` |
+| #23 | 2026-07-03 | #16 | `9077a6a` |
+| #24 | 2026-07-03 | #18 | `c8c40d2` |
+| #25 | 2026-07-03 | #19 | `d5bc4cd` |
+| #26 | 2026-07-03 | #15 | `fb65639` |
+| #27 | 2026-07-03 | #20 | `a078007` |
+| #28 | 2026-07-03 | #17 | `33dd78a` |
+| _this PR_ | _pending_ | #21 | _pending_ |
 
 ### ADRs adopted
 
-- ADR-001 — Go toolchain and YAML
-- ADR-002 — Platform binary selection
-- ADR-003 — JSON contract and exit codes
-- ADR-004 — Validation and severity model
-- ADR-005 — Safe filesystem layer
+- ADR-006 — Staged mutation / cross-file transaction model
+- ADR-007 — Profile-system boundary (one inheritance level; core)
+- ADR-009 — Install/upgrade/uninstall asset-ownership + version-record manifest
 
-## Validation evidence (2026-07-02, repo at `main` = `2b8f988`)
+All three were Codex-re-reviewed **`READY` (5/5, no blockers)** and flipped
+`proposed` → **`accepted`** on **2026-07-03** under the autonomous-phase
+mandate. They are **flagged for Oliver's async ratification** — recorded as a
+standing flag, not a merge blocker. Signing / provenance attestation is **not**
+covered by ADR-009; it is re-deferred to a dedicated supply-chain ADR, so the
+residual supply-chain risk stays `open` in
+[`../knowledge/risks.md`](../knowledge/risks.md).
 
-Toolchain: `go1.24.13 darwin/arm64` (`GOTOOLCHAIN=local`).
+## Validation evidence (2026-07-03, repo at `main` = `33dd78a`)
 
-- `go test ./...` — **PASS** (all 8 packages ok):
-  `cmd/gen-checksums`, `cmd/llm-wiki`, `internal/contract`,
-  `internal/fsafe`, `internal/platform`, `internal/profile`,
-  `internal/validate`, `internal/yamladapter`.
+Toolchain: `go1.24.13 darwin/arm64` (`GOTOOLCHAIN=local`,
+`/Users/hermes/sdk/go1.24.13/bin/go`).
+
+This is a docs-only closeout — **no product/source code changed.** Evidence is
+recorded in five categories, mirroring the discipline of
+[`../notes/eval-issue-020.md`](../notes/eval-issue-020.md). It does **not**
+claim "all five platforms green" or "full matrix green."
+
+**1. Local validation** (single Unix host — evidence about this host only):
+
 - `go build ./...` — **PASS** (exit 0).
 - `go vet ./...` — **PASS** (exit 0).
-- `go run ./cmd/llm-wiki validate --json testdata/fixtures/core-valid` —
-  **PASS**: `status: success`, empty `findings`, contract `v1`.
+- `go test ./...` — **PASS** (all 11 packages ok): `cmd/gen-checksums`,
+  `cmd/llm-wiki`, `internal/contract`, `internal/fsafe`, `internal/manifest`,
+  `internal/platform`, `internal/profile`, `internal/scaffold`, `internal/txn`,
+  `internal/validate`, `internal/yamladapter`.
+- `go test ./cmd/llm-wiki -run '^TestAcceptance' -count=1 -v` — **6/6 PASS**
+  (criteria 1, 2, 3×3, 4-core).
 
-## Next phase — Phase 2 / Install-init
+`go test ./...` passes here **because the host is Unix**; the file-permission
+assertions that fail on Windows (category 4) hold on this host. Local
+validation is not evidence about any other platform.
 
-Foundation is closed out; work moves to the install/init surface.
+**2. Named acceptance-step evidence (CI)** — the `Acceptance corpus (Phase 2
+gate evidence)` step runs `go test ./cmd/llm-wiki -run '^TestAcceptance'` before
+the full suite, per leg:
 
-## Notes
+| Platform (ADR-002) | Acceptance step |
+|---|---|
+| linux-amd64 | **6/6 PASS** |
+| linux-arm64 | **6/6 PASS** |
+| macos-arm64 | **6/6 PASS** |
+| windows-amd64 | **6/6 PASS** |
+| macos-amd64 | **not run** — runner unavailable (category 5) |
 
-- **CI is deferred to Phase 2.** There is no CI workflow yet; Phase 1
-  validation is the local evidence recorded above.
+Green on **all four platforms where a runner executed it (4 of 5), including
+Windows.** Not observed on macos-amd64.
+
+**3. Full CI matrix — NOT green:**
+
+| Platform (ADR-002) | full `go test ./...` |
+|---|---|
+| linux-amd64 | green |
+| linux-arm64 | green |
+| macos-arm64 | green |
+| windows-amd64 | **RED** — pre-existing `internal/` tests (category 4) |
+| macos-amd64 | **did not run** (category 5) |
+| `cross-compile-smoke` (5 binaries + checksum manifest) | green |
+| ADR-002 bundle selfcheck smoke (per-platform) | green |
+
+**4. Known pre-existing failure (not a Phase 2 regression):** windows-amd64
+full `go test ./...` is red **only** in `internal/fsafe` and `internal/txn`, on
+Unix file-permission-mode assertions (`mode = -rw-rw-rw-, want -rw-r-----`).
+Same failures on `main`'s own run at `fb65639`
+([run 28646677901](https://github.com/olivermorgan2/llm-wiki-kit/actions/runs/28646677901)).
+Tracked as follow-up issue **#29** (deferral, not fixed here).
+
+**5. macos-amd64 no evidence (runner unavailable):** the `macos-13` leg never
+dispatched — queued/never-ran on branches and `main` alike. The `main` tip run
+at `33dd78a`
+([run 28651421487](https://github.com/olivermorgan2/llm-wiki-kit/actions/runs/28651421487))
+was still **pending with no jobs dispatched** at closeout time. macos-amd64 has
+produced **no** acceptance evidence and **no** full-suite evidence; its code
+path is identical to green macos-arm64 and `cross-compile-smoke` builds
+`darwin/amd64` cleanly — **inference, not observed CI.** Tracked as follow-up
+issue **#30**.
+
+## Phase 2 exit criteria
+
+Exit gate (`design/build-out-plan.md` §Phase 2): acceptance criteria **2, 3,
+4 (core)** pass on all five platforms + criterion **1** (install half)
+demonstrated. Verdict: **observed on 4 of 5 platforms; macos-amd64 closed on
+inference + follow-up #30.** The closeout does **not** claim 5/5 — the gap is
+stated for Hermes/Oliver to weigh.
+
+| Criterion | Status | Evidence |
+|---|---|---|
+| **1** — install half (dry-run full plan, no-op) | pass (4/5 observed) | `TestAcceptanceCriterion1InstallDryRunFullPlanNoOp`; acceptance step |
+| **2** — CLI runs on every platform | pass (4/5 observed) | `TestAcceptanceCriterion2VersionRunsOnHostPlatform`; `cross-compile-smoke` + selfcheck smoke build/select the 5 binaries |
+| **3** — install into new + non-empty repos, no file loss, refusal zero-mutation | pass (4/5 observed) | `TestAcceptanceCriterion3InstallNewRepoThenValidateClean`, `…NonEmptyRepoNoFileLoss`, `…CollisionRefusalIsZeroMutation` |
+| **4 (core)** — init with core profile | pass (4/5 observed) | `TestAcceptanceCriterion4InitCoreThenValidateClean` |
+
+Full accounting in [`../notes/eval-issue-020.md`](../notes/eval-issue-020.md).
+
+## Next phase — Phase 3 / Authoring + staged mutation
+
+Goal: the thinnest end-to-end "create real value" path — author a new page
+through the staged, preview-before-write workflow (`page inspect` / `page plan`
+/ `page apply` with hash-bound, stale-rejecting plans; authoring skill adapter).
+
+**ADR dependency note:** ADR-006 (staged mutation) is accepted — Phase 3
+consumes its `inspect/plan/apply` UX + hash-bound stale-plan rejection half.
+**ADR-008 (provenance / citation resolution) must be drafted and accepted
+before Phase 3 authoring work** — it is the next-needed ADR (still a candidate
+in the build-out plan; the `design/adr/` index preserves the 008 gap).
+
+## Notes / deferrals
+
+- **Windows permission-mode tests** — full suite red on windows-amd64
+  (`internal/fsafe` + `internal/txn`); pre-existing, predates #20. Follow-up
+  issue **#29**.
+- **macos-amd64 runner gap** — `macos-13` leg never dispatched; no amd64-macOS
+  CI evidence. Phase 2 closed with this leg unobserved. Follow-up issue **#30**.
+- **Signing / provenance** — still deferred to a dedicated supply-chain ADR
+  (ADR-009 explicitly out of scope); residual supply-chain risk stays `open`.
+- **Oliver's async ratification** of ADR-006/007/009 remains outstanding —
+  recorded as a flag, consistent with the 2026-07-03 autonomous-phase mandate;
+  not a merge blocker.
+- **CI on this closeout PR** will show the windows full-suite job red
+  (pre-existing) and macos-amd64 may not dispatch — the PR is docs-only;
+  merging over the red/pending matrix is Hermes's gate call.

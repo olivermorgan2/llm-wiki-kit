@@ -464,6 +464,55 @@ code written; no accepted ADR edited in place; PR not merged.
 proceeds (CI test matrix, ADR-006 transaction layer, release builds + selection,
 `init` core profile, `install` lifecycle, acceptance fixtures, closeout).
 
+### 2026-07-03 — Phase 2 (Install/init) implementation train merged; phase closed out
+
+The full Phase 2 train (issues #14–#20) merged via PRs #22–#28; the closeout
+issue **#21** (this entry) refreshes [`../design/state.md`](../design/state.md)
+and the knowledge layer, records validation evidence, and closes the milestone
+(`Phase 2 — Install/init`, #2) on merge. **Docs-only — no product behavior
+changed.** [`../design/state.md`](../design/state.md) is the authoritative
+evidence artifact; this entry is the log pointer.
+
+**Merged train** (merge order):
+
+| Issue | Title (abbrev.) | ADR | PR | Merge |
+|---|---|---|---|---|
+| #14 | Draft + accept ADR-006/007/009 | 006/007/009 | #22 | `4136e70` |
+| #16 | Cross-file transaction commit on fsafe staging | 006 | #23 | `9077a6a` |
+| #18 | `init` core profile + wiki bundle scaffold | 007 | #24 | `c8c40d2` |
+| #19 | Install new + non-empty, `--dry-run`, refusal, version record | 009 | #25 | `d5bc4cd` |
+| #15 | Cross-platform CI test matrix (5 platforms) | — | #26 | `fb65639` |
+| #20 | Install/init acceptance corpus (gate evidence) | 002/003/005/006/009 | #27 | `a078007` |
+| #17 | Multi-platform release bundle + selfcheck smoke | 002 | #28 | `33dd78a` |
+
+**Gate evidence** (from [`../notes/eval-issue-020.md`](../notes/eval-issue-020.md)
++ PR #27/#28 CI; refreshed at closeout): acceptance corpus **6/6 PASS on 4 of 5
+platforms** (linux-amd64, linux-arm64, macos-arm64, windows-amd64);
+`cross-compile-smoke` + per-platform selfcheck smoke green; local
+`go build`/`vet`/`test ./...` green on the Unix dev host (11 packages) and the
+`TestAcceptance` corpus 6/6.
+
+**Two documented caveats — deferred, not hidden, not fixed here:**
+
+1. **windows-amd64 full `go test ./...` is RED** — pre-existing Unix
+   permission-mode assertions in `internal/fsafe` + `internal/txn`
+   (`mode = -rw-rw-rw-, want -rw-r-----`); predate #20, fail identically on
+   `main` at `fb65639`. Follow-up issue **#29** (`bug`).
+2. **macos-amd64 (`macos-13`) produced no evidence** — runner never dispatched
+   (queue/availability), on branch and `main` alike; `main` tip run at `33dd78a`
+   still pending with no jobs at closeout. Closed on inference (identical code
+   path to green macos-arm64 + clean `darwin/amd64` cross-compile), not observed
+   CI. Follow-up issue **#30** (`infra`).
+
+**Exit-criteria verdict:** the Phase 2 gate says criteria 2/3/4(core) pass on
+**all five** platforms; **4/5 were observed**, macos-amd64 by inference only.
+The closeout records the gap plainly and **does not claim 5/5** — the gate call
+is Hermes/Oliver's. Milestone #2 closes on merge of the #21 PR (not before).
+
+**Next:** Oliver async-ratifies ADR-006/007/009 (still flagged, not blocking);
+**ADR-008 (provenance/citation) must be drafted + accepted before Phase 3**
+authoring work; then Phase 3 issues.
+
 ### 2026-06-30 — Knowledge layer reconciled to canonical file set
 
 Aligned `knowledge/` with the project's explicit layer spec: added

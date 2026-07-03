@@ -6,11 +6,19 @@ Front door to the `llm-wiki-kit` knowledge layer. Conventions live in
 ## Current phase
 
 **Phase 1 / Foundation closed (issues #1–#6, PRs #7–#13, ADR-001–005 accepted).
-Phase 2 (Install / init) open: ADR-006/007/009 (issue #14, branch
-`docs/adr-006-007-009-install-init-foundations`, PR #22) Codex-re-reviewed
-`READY` (5/5) and **accepted** 2026-07-03 under the autonomous-phase mandate —
-flagged for Oliver's async ratification.** Bootstrapped 2026-06-30 from
-`claude-workflow-kit` v5.0.1.
+Phase 2 / Install-init closed (issues #14–#21, PRs #22–#28 + closeout PR;
+ADR-006/007/009 Codex-re-reviewed `READY` (5/5) and **accepted** 2026-07-03
+under the autonomous-phase mandate — flagged for Oliver's async ratification).**
+The install/init surface shipped: ADR-006 cross-file transaction layer (#16),
+`init` core profile (#18), `install` lifecycle + version-record manifest (#19),
+five-platform CI matrix (#15), install/init acceptance corpus (#20), and
+multi-platform release bundle + selfcheck smoke (#17); #21 is the closeout
+(state + knowledge refresh, evidence in [`../design/state.md`](../design/state.md)).
+Two CI caveats deferred with follow-ups: windows-amd64 full-suite RED
+(pre-existing `internal/` permission tests, **#29**) and macos-amd64 no CI
+evidence (runner unavailable, **#30**) — Phase 2 gate observed on **4/5**
+platforms, not 5/5. **Phase 3 / Authoring + staged mutation** is next.
+Bootstrapped 2026-06-30 from `claude-workflow-kit` v5.0.1.
 Source PRD normalized; adversarial Codex review (`NEEDS_REVISION`) landed as PRD
 addenda 001–005; `/prd-to-mvp` produced [`design/mvp.md`](../design/mvp.md) and
 [`design/build-out-plan.md`](../design/build-out-plan.md) (7 phases / Slices
@@ -49,19 +57,24 @@ questions **Q2/Q7/Q8 closed** with ADR + log back-references. See
 
 ## Next action
 
-**Phase 2 (Install / init) opened 2026-07-03; ADR prerequisites accepted.**
-ADR-006/007/009 (issue #14, milestone `Phase 2 — Install/init`, branch
-`docs/adr-006-007-009-install-init-foundations`, PR #22) were Codex-re-reviewed
-**`READY` (5/5, no blockers)** and flipped `proposed` → **`accepted`** under the
-2026-07-03 autonomous-phase mandate — **flagged for Oliver's async
-ratification**. The index was re-synced, Q7's install-ownership remainder closed
-against accepted ADR-009 (signing/provenance stays deferred to a dedicated
-supply-chain ADR), and the re-review archived at
-[`reviews/2026-07-03-codex-adr-006-007-009-rereview.md`](reviews/2026-07-03-codex-adr-006-007-009-rereview.md).
-The rest of the Phase 2 train then proceeds: CI test matrix, the ADR-006
-transaction layer, release builds + selection, `init` (core profile), the
-`install` lifecycle, acceptance fixtures, and closeout (see the operational
-plan).
+**Phase 2 / Install-init closed out 2026-07-03 (issues #14–#21, PRs #22–#28 +
+closeout PR).** The evidence artifact is [`../design/state.md`](../design/state.md)
+(merged issue/PR table, five-category validation evidence, exit-criteria
+verdict). Two caveats deferred with follow-ups: windows-amd64 full-suite RED
+(follow-up **#29**) and macos-amd64 no CI evidence (follow-up **#30**); the
+Phase 2 gate is **observed on 4/5** platforms, closed on inference for
+macos-amd64. Milestone #2 closes on merge of the #21 PR.
+
+Next moves, in order:
+
+1. **Oliver async-ratifies ADR-006/007/009** — accepted under the 2026-07-03
+   mandate, still flagged (not a blocker).
+2. **Draft ADR-008 (provenance / citation resolution)** — the next-needed ADR;
+   it must be drafted + accepted (via the Phase-1/2-precedent Codex gate) before
+   any Phase 3 authoring work. Draft any other Phase 3 ADR prerequisites the
+   build-out plan §Phase 3 names alongside it.
+3. **File Phase 3 issues** (`page inspect`/`plan`/`apply` + authoring skill
+   adapter) once ADR-008 is accepted.
 
 Phase 1 issues (all `Foundation`, repo `olivermorgan2/llm-wiki-kit`), closed via
 merged PRs #7–#13:
@@ -85,8 +98,9 @@ Explicit carry-forwards to hold in the first issue and beyond:
 - **ADR-003 numeric exit-code table** must be published (stable code→meaning) as
   part of Phase 1 before Phase 1 closes — deferred by ADR-003, not reopened.
 - **ADR-006** (staged mutation / inspect-plan-apply cross-file transaction model)
-  must be drafted **before any cross-file mutation/transaction implementation**;
-  it is the next-needed ADR after 001–005.
+  — was the next-needed ADR after 001–005; now **drafted + accepted** (#14,
+  2026-07-03) and its **transaction half implemented** in Phase 2 (#16/PR #23).
+  The `inspect/plan/apply` UX half is consumed by Phase 3.
 - **ADR-002 does not authorize** full installer / asset-ownership work — install/
   upgrade/uninstall ownership and release signing/provenance remain **ADR-009**.
 
