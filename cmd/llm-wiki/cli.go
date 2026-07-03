@@ -1,14 +1,19 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/olivermorgan2/llm-wiki-kit/internal/contract"
 	"github.com/olivermorgan2/llm-wiki-kit/internal/platform"
+	"github.com/olivermorgan2/llm-wiki-kit/internal/profile"
+	"github.com/olivermorgan2/llm-wiki-kit/internal/scaffold"
+	"github.com/olivermorgan2/llm-wiki-kit/internal/txn"
 	"github.com/olivermorgan2/llm-wiki-kit/internal/validate"
 	"github.com/olivermorgan2/llm-wiki-kit/internal/yamladapter"
 )
@@ -24,6 +29,12 @@ Usage:
 
 Commands:
   version     Print the engine version.
+  init        Scaffold a new wiki bundle in a target directory (default: the
+              current directory, which must already exist). Writes a bundle
+              config plus a minimal, immediately-valid core-profile wiki.
+              Use --profile <id> to select a profile (default: core) and
+              --force to overwrite an existing bundle. Without --force, init
+              refuses when any target file already exists (exit 3).
   validate    Validate a wiki against the OKF base and core profile. Reports
               OKF and profile findings separately at three severities
               (error/warning/suggestion). Takes an optional target directory
@@ -70,6 +81,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	switch command {
 	case "version":
 		return runVersion(stdout, jsonMode)
+	case "init":
+		return runInit(cmdArgs, stdout, stderr, jsonMode)
 	case "validate":
 		return runValidate(cmdArgs, stdout, jsonMode)
 	case "selfcheck":
@@ -130,6 +143,156 @@ func runVersion(stdout io.Writer, jsonMode bool) int {
 	}
 	fmt.Fprintf(stdout, "llm-wiki %s (contract %s)\n", version, contract.ContractVersion)
 	return int(contract.ExitSuccess)
+}
+
+// runInit scaffolds a new wiki bundle in a target directory. It parses its own
+// flags in the hand-rolled style of selfcheckRoot (the global loop only strips
+// --json), resolves the requested profile, plans the change set, and writes it
+// through one ADR-006 transaction so the bundle is created all-or-nothing.
+//
+// Refusal semantics: when any planned target already exists and --force was not
+// given, init mutates nothing and reports StatusApprovalRequired (exit 3), not
+// invalid-invocation. The invocation is well-formed — the operation simply
+// awaits explicit permission to overwrite — and contract.Approval is shaped for
+// exactly this; issue #19's install refusal reuses the same envelope, so exit 3
+// keeps init and install consistent. --force is the approval grant.
+func runInit(args []string, stdout, stderr io.Writer, jsonMode bool) int {
+	profileID := profile.CoreID
+	force := false
+	target := "."
+	haveTarget := false
+
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--profile" || a == "-profile":
+			if i+1 >= len(args) {
+				return initInvalid(stdout, stderr, jsonMode, "--profile requires a value")
+			}
+			i++
+			profileID = args[i]
+		case strings.HasPrefix(a, "--profile="):
+			profileID = strings.TrimPrefix(a, "--profile=")
+		case strings.HasPrefix(a, "-profile="):
+			profileID = strings.TrimPrefix(a, "-profile=")
+		case a == "--force" || a == "-force":
+			force = true
+		case strings.HasPrefix(a, "-"):
+			return initInvalid(stdout, stderr, jsonMode, fmt.Sprintf("unknown flag %q", a))
+		default:
+			if haveTarget {
+				return initInvalid(stdout, stderr, jsonMode, fmt.Sprintf("unexpected argument %q", a))
+			}
+			target = a
+			haveTarget = true
+		}
+	}
+
+	p, err := profile.Resolve(profileID)
+	if err != nil {
+		return initInvalid(stdout, stderr, jsonMode, fmt.Sprintf("unknown profile %q", profileID))
+	}
+
+	// Init never creates the target dir: fsafe/txn require an existing boundary.
+	info, err := os.Stat(target)
+	if err != nil || !info.IsDir() {
+		return initInvalid(stdout, stderr, jsonMode, fmt.Sprintf("target %q must be an existing directory", target))
+	}
+
+	changes := scaffold.Plan(p, time.Now().UTC())
+	conflicts, err := scaffold.Conflicts(target, changes)
+	if err != nil {
+		return initSystemFailure(stdout, stderr, jsonMode, err)
+	}
+	if len(conflicts) > 0 && !force {
+		return initRefuse(stdout, stderr, jsonMode, conflicts)
+	}
+
+	if err := commitScaffold(target, changes); err != nil {
+		return initSystemFailure(stdout, stderr, jsonMode, err)
+	}
+
+	env := contract.New("init", contract.StatusSuccess)
+	env.AffectedPaths = planTargets(changes)
+	if jsonMode {
+		return emit(stdout, env)
+	}
+	fmt.Fprintf(stdout, "init: created %d file(s) under %s\n", len(changes), target)
+	for _, c := range changes {
+		fmt.Fprintf(stdout, "  %s\n", c.Target)
+	}
+	return int(contract.ExitCodeForStatus(env.Status))
+}
+
+// commitScaffold writes the change set through one ADR-006 transaction. Any
+// txn/fsafe error (including ErrStale from a TOCTOU race between the conflict
+// check and commit — txn's internal rollback leaves the tree unmutated) is a
+// system failure: the tree is left as it was, never re-rendered as a refusal.
+// A best-effort Abort cleans up staging on the error path (ErrTxnDone, returned
+// once a failed Commit has already finalized the transaction, is expected).
+func commitScaffold(target string, changes []txn.FileChange) error {
+	tx, err := txn.Begin(target, changes)
+	if err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		if abErr := tx.Abort(); abErr != nil && !errors.Is(abErr, txn.ErrTxnDone) {
+			return fmt.Errorf("%w; abort also failed: %v", err, abErr)
+		}
+		return err
+	}
+	return nil
+}
+
+// planTargets returns the change set's targets in their existing sorted order —
+// the affectedPaths the success envelope reports. It is taken from the plan,
+// never from walking the tree.
+func planTargets(changes []txn.FileChange) []string {
+	paths := make([]string, len(changes))
+	for i, c := range changes {
+		paths[i] = c.Target
+	}
+	return paths
+}
+
+// initRefuse emits the approval-required refusal (exit 3): the invocation is
+// well-formed but the operation needs explicit permission to overwrite.
+func initRefuse(stdout, stderr io.Writer, jsonMode bool, conflicts []string) int {
+	env := contract.New("init", contract.StatusApprovalRequired)
+	env.Approval = &contract.Approval{
+		Required: true,
+		Reason:   "target files already exist; re-run with --force to overwrite",
+		Paths:    conflicts,
+	}
+	if jsonMode {
+		return emit(stdout, env)
+	}
+	fmt.Fprintf(stderr, "llm-wiki: init refused — %s\n", env.Approval.Reason)
+	for _, p := range conflicts {
+		fmt.Fprintf(stderr, "  %s\n", p)
+	}
+	return int(contract.ExitCodeForStatus(env.Status))
+}
+
+// initInvalid emits the invalid-invocation outcome (exit 4): JSON carries the
+// envelope; human mode explains the error and prints usage on stderr.
+func initInvalid(stdout, stderr io.Writer, jsonMode bool, msg string) int {
+	if jsonMode {
+		env := contract.New("init", contract.StatusInvalidInvocation)
+		return emit(stdout, env)
+	}
+	fmt.Fprintf(stderr, "llm-wiki: %s\n\n%s", msg, usage)
+	return int(contract.ExitInvalidInvocation)
+}
+
+// initSystemFailure maps a txn/fsafe error to the system-failure bucket (exit 5).
+func initSystemFailure(stdout, stderr io.Writer, jsonMode bool, cause error) int {
+	env := contract.New("init", contract.StatusSystemFailure)
+	if jsonMode {
+		return emit(stdout, env)
+	}
+	fmt.Fprintf(stderr, "llm-wiki: init failed: %v\n", cause)
+	return int(contract.ExitCodeForStatus(env.Status))
 }
 
 // runValidate walks a target directory (default ".") and reports OKF and
