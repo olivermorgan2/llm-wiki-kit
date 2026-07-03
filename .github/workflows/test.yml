@@ -93,22 +93,24 @@ jobs:
 
       - name: Cross-compile all five target binaries
         shell: bash
-        env:
-          CGO_ENABLED: "0"
         run: |
           set -euo pipefail
           # Keys mirror internal/platform.Platform.ArtifactPath:
-          # bin/<goos>_<goarch>/llm-wiki[.exe]. -trimpath keeps the binaries
-          # (and therefore their checksums) independent of the runner's
-          # workspace path. Version stamping via -ldflags is deliberately left
-          # to the release pipeline (cli.go), which is out of scope here.
+          # bin/<goos>_<goarch>/llm-wiki[.exe]. CGO_ENABLED=0 is set explicitly
+          # on each build command so every target is a static, portable binary
+          # with no libc linkage — this is what the platform-selection contract
+          # documents and it keeps checksums deterministic across runners.
+          # -trimpath keeps the binaries (and therefore their checksums)
+          # independent of the runner's workspace path. Version stamping via
+          # -ldflags is deliberately left to the release pipeline (cli.go),
+          # which is out of scope here.
           targets=("darwin amd64" "darwin arm64" "linux amd64" "linux arm64" "windows amd64")
           for t in "${targets[@]}"; do
             read -r goos goarch <<<"$t"
             out="bin/${goos}_${goarch}/llm-wiki"
             [ "$goos" = "windows" ] && out="${out}.exe"
             echo "building $out"
-            GOOS="$goos" GOARCH="$goarch" go build -trimpath -o "$out" ./cmd/llm-wiki
+            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" go build -trimpath -o "$out" ./cmd/llm-wiki
           done
 
       - name: Generate checksum manifest
