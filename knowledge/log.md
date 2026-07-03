@@ -367,6 +367,59 @@ ADR-002 ≠ ADR-009 installer boundary.
 **Next step:** implement **#1** via `/claude-issue-executor` (plan-first, one
 issue per session); draft **ADR-006** before any cross-file mutation work.
 
+### 2026-07-03 — ADR-006/007/009 drafted (`proposed`) — Phase-2 install/init prerequisites
+
+Opened Phase 2 (**`Phase 2 — Install/init`** milestone, issue **#14**, label
+`design`, branch `docs/adr-006-007-009-install-init-foundations`) by drafting the
+three ADR prerequisites the build-out plan §Phase 2 names as dependencies
+(seeds #6, #7, #9 in `design/build-out-plan.md`). All three content-derive from
+accepted ADRs + addenda — no un-inferable product decision — so they were
+authored under the 2026-07-03 autonomous-phase mandate (Fable plans, Opus 4.8
+auto builds, Hermes drives).
+
+- **[ADR-006](../design/adr/adr-006-staged-mutation-transaction-model.md)** —
+  staged mutation lifecycle + **cross-file transaction model** that
+  [ADR-005](../design/adr/adr-005-safe-filesystem-layer.md) explicitly deferred:
+  stage the full change set under `.llm-wiki/staging/<txn-id>/`, staging
+  manifest with source/target base hashes, validate-before-commit, journaled
+  ordered per-file atomic-rename commit, partial-commit detection +
+  roll-forward/back, temp cleanup. Phase 2 consumes the **transaction** half;
+  Phase 3 consumes the `inspect/plan/apply` UX + hash-bound stale-plan
+  rejection. Criteria 3, 11, 12, 13, 20.
+- **[ADR-007](../design/adr/adr-007-profile-system-boundary.md)** — declarative
+  data profiles, **one** inheritance level (`academic-research` extends `core`),
+  id-based resolution with a reserved Phase-7 local-path seam; ratifies the
+  existing `internal/profile` `Loader` shape; `init` materializes a profile
+  **reference** (not a rule-data copy). Phase 2 exercises only `core`. Criteria
+  4, 5; addenda 003/005; Q5 registry/trust stays Phase 3.
+- **[ADR-009](../design/adr/adr-009-install-upgrade-uninstall-ownership.md)** —
+  explicit **plugin-owned vs repo-owned** asset classification + version-record
+  file (plugin/CLI/OKF/profile versions); install via the ADR-006 transaction,
+  `--dry-run` zero-mutation preview, silent-overwrite refusal, non-empty-repo
+  no-file-loss (install half, Phase 2); upgrade/uninstall preservation
+  **decided** here, **implemented** Phase 7. Takes the install-ownership
+  remainder ADR-002 carved out (criteria 1, 3, 20). **Signing / provenance**
+  attestation is explicitly deferred to a dedicated supply-chain ADR (mirrors
+  ADR-002); residual supply-chain risk stays `open`.
+
+**Status = `proposed` (not yet accepted).** Per the plan's Phase-1-precedent
+gate, acceptance follows an **independent Codex adversarial ADR review** (run by
+Hermes after the PR opens) reaching `READY`; only then are statuses flipped to
+`accepted` under the mandate and **flagged for Oliver's async ratification**,
+with verbatim review artifacts archived under `knowledge/reviews/`. This entry
+records the drafting; no acceptance is claimed here and **Q7 is not closed** —
+`open-questions.md` carries a Phase-2 annotation, not a resolution.
+
+**Validation:** `check-plan --criteria-set adr --non-interactive` deterministic
+**ADR-C1–C5 pass** on all three (C6 is the standing best-effort warning);
+`sync-adr-index` regenerated `design/adr/README.md` (008 gap preserved);
+`GOTOOLCHAIN=local go test ./...` green; no `{{`/`}}`/`_TBD_`/`TODO`
+placeholders. No product/source code written; no accepted ADR edited in place.
+
+**Next step:** Hermes runs the independent Codex ADR gate on the PR; on `READY`,
+flip statuses to `accepted`, re-sync the index, close Q7's install-ownership
+remainder, and archive the review. Then Phase 2 train items 1–7 proceed.
+
 ### 2026-06-30 — Knowledge layer reconciled to canonical file set
 
 Aligned `knowledge/` with the project's explicit layer spec: added

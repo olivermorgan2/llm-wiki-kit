@@ -5,9 +5,11 @@ Front door to the `llm-wiki-kit` knowledge layer. Conventions live in
 
 ## Current phase
 
-**ADR-001–005 human-accepted (2026-07-01); Phase 1 (engine + contract spine)
-backlog filed as GitHub issues #1–#6, first prompt prepared — implementation
-next.** Bootstrapped 2026-06-30 from `claude-workflow-kit` v5.0.1.
+**Phase 1 / Foundation closed (issues #1–#6, PRs #7–#13, ADR-001–005 accepted).
+Phase 2 (Install / init) open: ADR-006/007/009 drafted `proposed` (issue #14,
+branch `docs/adr-006-007-009-install-init-foundations`) — pending the
+independent Codex ADR gate before acceptance.** Bootstrapped 2026-06-30 from
+`claude-workflow-kit` v5.0.1.
 Source PRD normalized; adversarial Codex review (`NEEDS_REVISION`) landed as PRD
 addenda 001–005; `/prd-to-mvp` produced [`design/mvp.md`](../design/mvp.md) and
 [`design/build-out-plan.md`](../design/build-out-plan.md) (7 phases / Slices
@@ -42,18 +44,24 @@ questions **Q2/Q7/Q8 closed** with ADR + log back-references. See
 | [`design/prd-addenda/`](../design/prd-addenda/) | Additive review fixes 001–005 carried into the PRD gate. |
 | [`design/mvp.md`](../design/mvp.md) | MVP statement — scope, principles, success criteria, binding ship gate. |
 | [`design/build-out-plan.md`](../design/build-out-plan.md) | 7-phase plan, criteria→phase map, milestones, issue backlog, ADR-001–012 candidates. |
-| [`design/adr/`](../design/adr/) | ADR index — ADR-001–005 **accepted** (2026-07-01); ADR-006–012 candidates still surfaced by the build-out plan (ADR-006 is the next-needed draft — cross-file transaction model). |
+| [`design/adr/`](../design/adr/) | ADR index — ADR-001–005 **accepted** (2026-07-01); ADR-006/007/009 drafted **`proposed`** (2026-07-03, Phase 2 — transaction model, profile system, install ownership) pending the Codex ADR gate; ADR-008/010/011/012 candidates still surfaced by the build-out plan. |
 
 ## Next action
 
-**Phase 1 backlog filed as GitHub issues #1–#6 (2026-07-01)** under the
-`Foundation` milestone; the first issue's prompt is prepared at
-[`../prompts/issue-001-cli-contract-spine.md`](../prompts/issue-001-cli-contract-spine.md).
-The next workflow step is to **implement issue #1** via `/claude-issue-executor`
-(plan-first, one issue per session), and in parallel **draft ADR-006** before
-any cross-file mutation work begins.
+**Phase 2 (Install / init) opened 2026-07-03.** ADR-006/007/009 are drafted
+`proposed` on branch `docs/adr-006-007-009-install-init-foundations` (issue #14,
+milestone `Phase 2 — Install/init`). The next workflow step is the **independent
+Codex adversarial ADR review** (run by Hermes on the PR); on `READY`, flip the
+three statuses to `accepted` under the 2026-07-03 autonomous-phase mandate
+(flagged for Oliver's async ratification), re-sync the index, close Q7's
+install-ownership remainder, and archive the review under `knowledge/reviews/`.
+The rest of the Phase 2 train then proceeds: CI test matrix, the ADR-006
+transaction layer, release builds + selection, `init` (core profile), the
+`install` lifecycle, acceptance fixtures, and closeout (see the operational
+plan).
 
-Phase 1 issues (all `Foundation`, repo `olivermorgan2/llm-wiki-kit`):
+Phase 1 issues (all `Foundation`, repo `olivermorgan2/llm-wiki-kit`), closed via
+merged PRs #7–#13:
 
 | # | Title (abbrev.) | ADR(s) | Label |
 |---|---|---|---|
