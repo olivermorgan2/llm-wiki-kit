@@ -155,30 +155,47 @@ autolinks, and raw HTML remain out of scope for the MVP, inheriting
 inline link. The engine **never invents** a citation (FR5): absence of a
 required citation is *reported*, never *filled*.
 
-**2. "Resolvable" per target class — deterministic and offline.** A citation
-target is classified into exactly one of three **syntactically disjoint**
-classes and checked without any network I/O:
+**2. "Resolvable" per target class — deterministic, offline, and total.** Inside
+an evidence context every inline-link target is a citation target (sub-decision
+1), so the classification must be **total over the shipped inline-link grammar**
+and checked without any network I/O. A target is classified by the following
+**ordered, deterministic** procedure; the first matching class wins, and the
+final catch-all guarantees no target is left without a verdict:
 
-- **http(s) URL** (target begins with an `http:`/`https:` scheme): **resolvable
-  iff it is syntactically a valid absolute URL with a non-empty host.** Liveness
-  is **never fetched and never gated** — reachability is measurement-only
-  (addendum 001), consistent with `links.go` never fetching external targets.
-- **In-bundle OKF document** (a scheme-less intra-wiki reference, per
-  `isIntraWiki`): **resolvable iff `resolveTarget` yields a cleaned path that is
-  a member of the bundle file set** (`exists`), reusing the shipped semantics
-  verbatim — `#fragment`/`?query` stripped, leading `/` treated as
-  bundle-root-absolute, `path.Clean` applied.
-- **Repo-relative path** (a scheme-less reference that resolves **outside** the
-  bundle but **inside** the repository root — see sub-decision 3): **resolvable
-  iff a read-only existence check (`stat`) inside the repo root succeeds.**
+1. **http(s) URL** (target begins with a case-insensitive `http:`/`https:`
+   scheme, per the shipped `uriScheme` regex): **resolvable iff it is
+   syntactically a valid absolute URL with a non-empty host.** An http(s) target
+   that is **syntactically invalid** (e.g. `https://` with an empty host) is
+   **malformed** (`core-citation-malformed`), *not* unresolved — it can never
+   resolve. Liveness is **never fetched and never gated** — reachability is
+   measurement-only (addendum 001), consistent with `links.go` never fetching
+   external targets.
+2. **In-bundle OKF document** (a scheme-less intra-wiki reference, per
+   `isIntraWiki`, whose `resolveTarget` cleaned path stays **within the bundle
+   root**): **resolvable iff that cleaned path is a member of the bundle file
+   set** (`exists`), reusing the shipped semantics verbatim — `#fragment`/
+   `?query` stripped, leading `/` treated as bundle-root-absolute, `path.Clean`
+   applied. A cleaned path inside the bundle that is **absent** is
+   `core-citation-unresolved`.
+3. **Repo-relative path** (a scheme-less reference that, via the sub-decision-3
+   `../` refinement, resolves **outside** the bundle but **inside** the
+   repository root): **resolvable iff a read-only existence check (`stat`) inside
+   the repo root succeeds**; a well-formed repo-path that is absent is
+   `core-citation-unresolved`.
+4. **Malformed catch-all** (`core-citation-malformed`) — every remaining target:
+   **empty**; a **non-http(s) URI scheme** (e.g. `mailto:`, `ftp:`, a private
+   `repo:`-style scheme); a **fragment-only** target (`#sec`) or a
+   **protocol-relative** target (`//host/p`) — neither of which `isIntraWiki`
+   accepts and neither of which names a resolvable citation; and any
+   scheme-less path that **escapes the repo root** via `../`. Malformed targets
+   can never resolve.
 
-A target that is **malformed** — empty, a non-http(s) URI scheme (e.g.
-`mailto:`, `ftp:`, a private `repo:`-style scheme), or a path that **escapes the
-repo root** — is a **distinct condition from unresolved**: malformed targets can
-never resolve and are reported as `core-citation-malformed`, whereas a
-well-formed target that simply is not present is `core-citation-unresolved`.
-This distinction is what lets a profile promote "malformed" to error while
-leaving "unresolved" a warning.
+The **malformed-vs-unresolved** split is load-bearing: *malformed* (classes 1
+invalid-host and 4) can never resolve regardless of repository state, while
+*unresolved* (classes 2 and 3, well-formed but absent) may become resolvable
+when the target is created. This is exactly what lets a profile promote
+"malformed" to error while leaving "unresolved" a warning, and it makes the
+partition total — no citation target falls between the two codes.
 
 **3. Repo-path class mechanics, read scope, and the `../` refinement.** The
 repository root is anchored at the **nearest ancestor directory containing
@@ -191,11 +208,17 @@ now resolves against the repo-path class, while a sequence that **escapes the
 repo root remains unresolved/malformed**. This refinement is applied **uniformly
 through one resolution table** — navigational links get the same widened
 resolution, so there is exactly one resolver and one notion of "escape," not two.
-The repo-path check is a **read-only `stat`**, never a read of contents, is
-**never performed above the anchor**, and consults the filesystem only for this
-class — consistent with (and strictly narrower than) the ADR-005 write boundary,
-which already canonicalizes and resolves symlinks; a target that canonicalizes
-outside the repo root is an **escape** (malformed), never followed. The rejected
+The repo-path check is a **read-only `stat`**, never a read of contents, and is
+**never performed above the anchor**. It introduces the first validation-time
+filesystem read (`links.go` today takes membership through an injected `exists
+func(string)` seam and touches no disk; `links.go:36,48`), so it must run behind
+the **same injection seam** and through the **same canonicalize / resolve-symlink
+primitives** the ADR-005 write-gate uses: a target that canonicalizes outside the
+repo root is an **escape** (malformed), never followed. Note that ADR-005 is a
+**write** gate — reads are outside its stated scope — so this read path is not
+*governed* by ADR-005 but is **bounded by the same repo-root anchor and
+symlink-resolution rules**, staying strictly inside the write boundary it can
+never exceed. The rejected
 alternative — a private `repo:` URI prefix to keep the classes lexically
 disjoint without touching `../` — is declined because it invents a scheme that
 is dead in every Markdown viewer (a principle-6 violation) and still needs the
@@ -227,23 +250,46 @@ inherit the **parse-failure gate** (malformed YAML fails before any citation
 finding is computed), and aggregate **one problem into one finding** keyed by
 the `{ruleset, code, path}` baseline fingerprint.
 
-*Core mechanism (ships as engine defaults; new codes):*
+**Ruleset tag (decided here, reconciled with shipped reality).** The contract
+`Ruleset` enum has exactly two values — `okf` and `profile`
+(`internal/contract/envelope.go:38-39`); **there is no "core" ruleset**. The
+`core-` code prefix denotes an **engine-shipped default rule** (rule origin and
+naming), **not** a ruleset tag. Every new `core-citation-*` and
+`profile-citation-*` code is tagged **`ruleset: profile`**, matching the shipped
+`core-broken-link` finding — which is itself emitted as `RulesetProfile`
+(`internal/validate/links.go:61`) and which the citation rules share a resolver
+with and **subsume** in evidence contexts (sub-decision 7). Tagging citations
+`profile` keeps the criterion-5 OKF-vs-profile split coherent (citation
+obligations arise from **profile-designated** evidence contexts, not universal
+OKF structure) and guarantees the subsuming and subsumed findings sit in the
+**same** ruleset, so a single target never yields one OKF and one profile
+finding.
+
+*Core mechanism (engine-shipped default rules; new codes, `ruleset: profile`):*
 
 | Condition | Code | Default severity |
 |---|---|---|
-| Citation target malformed (empty / non-http(s) scheme / repo-root escape) | `core-citation-malformed` | **warning** (profile-promotable to error) |
+| Citation target malformed (invalid-host http(s) / empty / non-http(s) scheme / fragment-only / protocol-relative / repo-root escape) | `core-citation-malformed` | **warning** (profile-promotable to error) |
 | Citation target well-formed but unresolved in an evidence context | `core-citation-unresolved` | **warning** (profile-promotable to error) |
 | Same normalized target cited twice in one evidence context | `core-citation-duplicate` | **suggestion** |
-| Net loss of an existing citation at plan time (sub-decision 6) | `core-citation-loss` | **warning** + `approval` (sub-decision 6) |
+| Net loss of an existing citation at plan time (sub-decision 6) | `core-citation-loss` | **warning** (apply-gated via `approval`, sub-decision 6) |
 | Unresolved link in a **navigational** (non-evidence) context | `core-broken-link` (unchanged) | **warning** |
 
-*Profile rules (Phase 4 data — vocabulary fixed now, keys not frozen):*
+*Profile rules (Phase 4 data — vocabulary fixed now, keys not frozen;
+`ruleset: profile`):*
 
 | Condition | Code | Severity |
 |---|---|---|
 | A claim that obliges a citation has none | `profile-citation-required` | **error** |
-| A required citation is unresolved in the evidence context | `profile-citation-unresolved` | **error** (profile promotion of the core warning) |
 | Citation points at a forbidden target type (e.g. a `question` page) | `profile-citation-target-type` | **error** |
+
+A profile that requires a citation to *resolve* does **not** introduce a new
+code: it is expressed as a **severity promotion of `core-citation-unresolved`**
+(and, where wanted, `core-citation-malformed`) from warning to **error** within
+the ADR-004 configurable set — same code, promoted severity — so an unresolved
+required citation is **one** finding, never a `core-` warning and a separate
+`profile-` error for the same target. This is the ADR-004 promotion mechanism
+(a severity change on the same code), not a second finding.
 
 The **minimum declarative vocabulary** a profile needs to express the Phase-4
 rules — *sketched here, not frozen* — is: (a) which sections/fields are
@@ -256,25 +302,37 @@ exit-code values: the mechanism is decided now; the surface syntax is fixed when
 the `academic-research` profile lands, so addendum 003 can still be superseded by
 Oliver without reopening this ADR.
 
-**6. Preservation: byte mechanics plus a plan-time citation-loss diff.**
-Byte-level preservation of frontmatter and body stays exactly where it is —
-ADR-001's node-aware YAML round-trip and ADR-006's staged transaction (unknown
-fields preserved, comments best-effort). ADR-008 adds **one content rule**: at
-**plan time**, the engine computes, per page and per evidence context, the set
-of **normalized citation targets** in the source and in the staged result; a
-**net loss** (a normalized target present before and absent after) emits a
-`core-citation-loss` finding and sets the envelope's **existing `approval`**
-member, so `apply` **refuses without explicit approval** — the same
-deletions-require-approval discipline ADR-006 already applies to destructive
-commits, reusing that path with **no envelope change**. This makes FR4/FR5
-"preserve existing citations" *enforceable* rather than aspirational: a rewrite
-that silently drops a source is surfaced and gated, while a deliberate,
-approved removal still goes through. **Normalization** for this equality (and
+**6. Preservation: byte mechanics plus an ADR-008-owned plan-time citation-loss
+gate.** Byte-level preservation of frontmatter and body stays exactly where it
+is — ADR-001's node-aware YAML round-trip and ADR-006's staged transaction
+(unknown fields preserved, comments best-effort). ADR-006's only `apply` refusal
+is **stale-plan rejection** (base hashes changed since plan;
+[adr-006](adr-006-staged-mutation-transaction-model.md) Decision); it has **no**
+content-approval gate. ADR-008 therefore **owns** a new apply-time content rule
+and does not attribute it to ADR-006. At **plan time**, the engine computes, per
+page and per evidence context, the set of **normalized citation targets** in the
+source and in the staged result; a **net loss** (a normalized target present
+before and absent after) emits a `core-citation-loss` finding. **The apply-time
+block is carried by the ADR-003 `approval` member, not by the warning
+severity:** a plan containing an un-approved `core-citation-loss` finding sets
+the envelope's existing **`approval`** member, and `apply` returns
+**approval-required** (`StatusApprovalRequired` / `ExitApprovalRequired`,
+`internal/contract/{envelope,exitcode}.go`) and **refuses to commit** until the
+loss is explicitly approved — so the `core-citation-loss` warning is *reported*
+non-failingly per ADR-004, while the separate `approval` member is what gates the
+commit (no ADR-004 contradiction, and **no envelope change** — the member
+already exists per ADR-003). This makes FR4/FR5 "preserve existing citations"
+*enforceable* rather than aspirational: a rewrite that silently drops a source is
+surfaced and gated at `apply`, while a deliberate, approved removal still goes
+through. **Normalization** for this equality (and
 for `core-citation-duplicate`) is defined per class so it is deterministic: for
 **in-bundle** and **repo-path** targets, the `resolveTarget`-cleaned path
 (`#fragment`/`?query` stripped, leading `/` normalized, `path.Clean`); for
-**http(s) URL** targets, the **trimmed target string compared verbatim** (no
-network-aware canonicalization — offline determinism over URL cleverness).
+**http(s) URL** targets, the **trimmed target string compared verbatim** —
+scheme detection is case-insensitive (the shipped `uriScheme` regex), but the
+target is otherwise compared byte-for-byte with no network-aware canonicalization
+(no host case-folding, no fragment stripping) — offline determinism over URL
+cleverness.
 
 **7. Finding overlap with `core-broken-link` (one resolver, one finding).**
 There is **one** resolver shared by navigational links and citations. A target
@@ -283,8 +341,11 @@ is evaluated **once**; its **context** decides which rule owns it. In an
 that target — a single unresolved citation yields `core-citation-unresolved`,
 **not** an additional `core-broken-link`, so one bad link is never two findings.
 Outside evidence contexts, behavior is **unchanged**: `core-broken-link` fires
-exactly as it does today. New codes follow the shipped `okf-*` / `core-*`
-convention and are ruleset-tagged per ADR-004.
+exactly as it does today. New codes follow the shipped `core-*` naming
+convention and carry `ruleset: profile` (sub-decision 5) — the same ruleset as
+the `core-broken-link` they subsume — so the subsuming and subsumed findings are
+always in one ruleset and a single target is never double-counted across the
+OKF/profile split.
 
 ## Consequences
 
