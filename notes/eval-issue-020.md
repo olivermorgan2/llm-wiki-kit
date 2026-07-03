@@ -77,10 +77,16 @@ platform.
 
 The `Acceptance corpus (Phase 2 gate evidence)` CI step runs
 `go test ./cmd/llm-wiki -run '^TestAcceptance' -count=1 -v` before the full
-suite, per matrix leg. Latest observed evidence — run
+suite, per matrix leg. Current-tip matrix — run
+[28649100613](https://github.com/olivermorgan2/llm-wiki-kit/actions/runs/28649100613)
+(branch tip `d62b688`) — reproduces the same per-platform job outcomes below;
+the Windows **6/6 acceptance-step PASS** log excerpt was captured from run
 [28648011244](https://github.com/olivermorgan2/llm-wiki-kit/actions/runs/28648011244)
-(branch tip `2ac87a6`; each push re-runs the matrix, so consult the newest
-run on PR #27 for the current tip):
+(same failure pattern; an in-progress run's per-job logs are not downloadable
+until it finalizes). Note: each push re-runs the matrix and the concurrency
+guard marks the **run**-level status of a superseded run `cancelled`, but the
+individual per-platform **jobs** still complete with real `success`/`failure`
+conclusions and real logs — so consult the newest run on PR #27 for the tip:
 
 | Platform (ADR-002) | Acceptance step | Runner |
 |---|---|---|
