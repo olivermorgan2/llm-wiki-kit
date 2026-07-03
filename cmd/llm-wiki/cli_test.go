@@ -43,6 +43,235 @@ func decodeEnvelope(t *testing.T, stdout string) contract.Envelope {
 	return env
 }
 
+// initTargets is the exact scaffold the init command materializes, in the
+// sorted slash-form order the success envelope reports.
+var initTargets = []string{"llm-wiki.yaml", "wiki/index.md", "wiki/templates/page-template.md"}
+
+// AC1 end-to-end: a fresh init produces a bundle that validates with ZERO
+// findings, and all three files land on disk.
+func TestInitProducesBundleThatValidatesClean(t *testing.T) {
+	dir := t.TempDir()
+
+	_, _, code := exec(t, "init", dir, "--json")
+	if code != int(contract.ExitSuccess) {
+		t.Fatalf("init exit = %d, want 0", code)
+	}
+	for _, rel := range initTargets {
+		if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(rel))); err != nil {
+			t.Errorf("scaffold file %q missing: %v", rel, err)
+		}
+	}
+
+	stdout, _, code := exec(t, "validate", dir, "--json")
+	env := decodeEnvelope(t, stdout)
+	if env.Status != contract.StatusSuccess {
+		t.Errorf("validate status = %q, want success (%+v)", env.Status, env.Findings)
+	}
+	if len(env.Findings) != 0 {
+		t.Errorf("scaffolded bundle must validate with zero findings, got %+v", env.Findings)
+	}
+	if code != int(contract.ExitSuccess) {
+		t.Errorf("validate exit = %d, want 0", code)
+	}
+}
+
+// AC3 success envelope shape: operation init, status success, the three sorted
+// affectedPaths, empty findings, nil approval.
+func TestInitJSONSuccessEnvelope(t *testing.T) {
+	dir := t.TempDir()
+
+	stdout, _, code := exec(t, "init", dir, "--json")
+	env := decodeEnvelope(t, stdout)
+	if env.Operation != "init" {
+		t.Errorf("operation = %q, want init", env.Operation)
+	}
+	if env.Status != contract.StatusSuccess {
+		t.Errorf("status = %q, want success", env.Status)
+	}
+	if len(env.AffectedPaths) != len(initTargets) {
+		t.Fatalf("affectedPaths = %v, want %v", env.AffectedPaths, initTargets)
+	}
+	for i, want := range initTargets {
+		if env.AffectedPaths[i] != want {
+			t.Errorf("affectedPaths[%d] = %q, want %q", i, env.AffectedPaths[i], want)
+		}
+	}
+	if len(env.Findings) != 0 {
+		t.Errorf("findings = %v, want empty", env.Findings)
+	}
+	if env.Approval != nil {
+		t.Errorf("approval = %+v, want nil on success", env.Approval)
+	}
+	if code != int(contract.ExitSuccess) {
+		t.Errorf("exit = %d, want 0", code)
+	}
+}
+
+// snapshotBundle records the on-disk bytes of the scaffold files so a refusal
+// can be proven non-mutating.
+func snapshotBundle(t *testing.T, dir string) map[string][]byte {
+	t.Helper()
+	snap := map[string][]byte{}
+	for _, rel := range initTargets {
+		if b, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(rel))); err == nil {
+			snap[rel] = b
+		}
+	}
+	return snap
+}
+
+// AC2 re-init refusal: a second init without --force refuses with an
+// approval-required envelope listing all conflicts and mutates nothing.
+func TestInitReinitRefusesWithApprovalEnvelope(t *testing.T) {
+	dir := t.TempDir()
+	if _, _, code := exec(t, "init", dir, "--json"); code != int(contract.ExitSuccess) {
+		t.Fatalf("first init exit = %d, want 0", code)
+	}
+	before := snapshotBundle(t, dir)
+
+	stdout, _, code := exec(t, "init", dir, "--json")
+	if code != int(contract.ExitApprovalRequired) {
+		t.Fatalf("re-init exit = %d, want 3", code)
+	}
+	env := decodeEnvelope(t, stdout)
+	if env.Status != contract.StatusApprovalRequired {
+		t.Errorf("status = %q, want approval-required", env.Status)
+	}
+	if env.Approval == nil || !env.Approval.Required {
+		t.Fatalf("approval must be present and required, got %+v", env.Approval)
+	}
+	if len(env.Approval.Paths) != len(initTargets) {
+		t.Errorf("approval paths = %v, want all three targets", env.Approval.Paths)
+	}
+	for i, want := range initTargets {
+		if env.Approval.Paths[i] != want {
+			t.Errorf("approval path[%d] = %q, want %q", i, env.Approval.Paths[i], want)
+		}
+	}
+	after := snapshotBundle(t, dir)
+	for rel, b := range before {
+		if !bytes.Equal(after[rel], b) {
+			t.Errorf("refusal mutated %q", rel)
+		}
+	}
+}
+
+// AC2 partial conflict: only a user-owned llm-wiki.yaml pre-exists, so the
+// refusal lists exactly it, the user's bytes are untouched, and wiki/ is never
+// created.
+func TestInitPartialConflictRefusesAndPreservesUserFile(t *testing.T) {
+	dir := t.TempDir()
+	userBytes := []byte("# my own file\n")
+	if err := os.WriteFile(filepath.Join(dir, "llm-wiki.yaml"), userBytes, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, _, code := exec(t, "init", dir, "--json")
+	if code != int(contract.ExitApprovalRequired) {
+		t.Fatalf("exit = %d, want 3", code)
+	}
+	env := decodeEnvelope(t, stdout)
+	if len(env.Approval.Paths) != 1 || env.Approval.Paths[0] != "llm-wiki.yaml" {
+		t.Errorf("approval paths = %v, want [llm-wiki.yaml]", env.Approval.Paths)
+	}
+	if got, _ := os.ReadFile(filepath.Join(dir, "llm-wiki.yaml")); !bytes.Equal(got, userBytes) {
+		t.Errorf("user file was modified: %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "wiki")); !os.IsNotExist(err) {
+		t.Errorf("wiki/ must not be created on a refused init")
+	}
+}
+
+// --force grants the approval: init over an existing bundle succeeds and
+// rewrites the files.
+func TestInitForceOverwritesExistingBundle(t *testing.T) {
+	dir := t.TempDir()
+	if _, _, code := exec(t, "init", dir, "--json"); code != int(contract.ExitSuccess) {
+		t.Fatalf("first init exit = %d, want 0", code)
+	}
+	// Corrupt one file so we can prove --force rewrote it.
+	if err := os.WriteFile(filepath.Join(dir, "wiki", "index.md"), []byte("stale"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, _, code := exec(t, "init", dir, "--force", "--json")
+	if code != int(contract.ExitSuccess) {
+		t.Fatalf("forced init exit = %d, want 0\n%s", code, stdout)
+	}
+	if got, _ := os.ReadFile(filepath.Join(dir, "wiki", "index.md")); string(got) == "stale" {
+		t.Errorf("--force did not rewrite wiki/index.md")
+	}
+}
+
+func TestInitExplicitCoreProfileSucceeds(t *testing.T) {
+	dir := t.TempDir()
+	_, _, code := exec(t, "init", dir, "--profile", "core", "--json")
+	if code != int(contract.ExitSuccess) {
+		t.Errorf("init --profile core exit = %d, want 0", code)
+	}
+}
+
+func TestInitUnknownProfileIsInvalidInvocation(t *testing.T) {
+	dir := t.TempDir()
+	stdout, _, code := exec(t, "init", dir, "--profile", "bogus", "--json")
+	env := decodeEnvelope(t, stdout)
+	if env.Status != contract.StatusInvalidInvocation {
+		t.Errorf("status = %q, want invalid-invocation", env.Status)
+	}
+	if code != int(contract.ExitInvalidInvocation) {
+		t.Errorf("exit = %d, want 4", code)
+	}
+}
+
+func TestInitMissingTargetDirIsInvalidInvocation(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "does-not-exist")
+	_, _, code := exec(t, "init", dir, "--json")
+	if code != int(contract.ExitInvalidInvocation) {
+		t.Errorf("exit = %d, want 4", code)
+	}
+}
+
+func TestInitUnknownFlagIsInvalidInvocation(t *testing.T) {
+	dir := t.TempDir()
+	_, _, code := exec(t, "init", dir, "--frobnicate", "--json")
+	if code != int(contract.ExitInvalidInvocation) {
+		t.Errorf("exit = %d, want 4", code)
+	}
+}
+
+// Human-mode success prints the created paths to stdout and no JSON envelope.
+func TestInitHumanModeSuccessListsPaths(t *testing.T) {
+	dir := t.TempDir()
+	stdout, _, code := exec(t, "init", dir)
+	if code != int(contract.ExitSuccess) {
+		t.Fatalf("exit = %d, want 0", code)
+	}
+	if strings.Contains(stdout, "{") {
+		t.Errorf("human-mode success must not emit JSON: %s", stdout)
+	}
+	if !strings.Contains(stdout, "wiki/index.md") {
+		t.Errorf("success output should list created paths: %s", stdout)
+	}
+}
+
+// Human-mode refusal prints the reason and --force hint to stderr, exit 3.
+func TestInitHumanModeRefusalPrintsHintToStderr(t *testing.T) {
+	dir := t.TempDir()
+	if _, _, code := exec(t, "init", dir); code != int(contract.ExitSuccess) {
+		t.Fatalf("first init exit = %d, want 0", code)
+	}
+	stdout, stderr, code := exec(t, "init", dir)
+	if code != int(contract.ExitApprovalRequired) {
+		t.Fatalf("exit = %d, want 3", code)
+	}
+	if strings.Contains(stdout, "{") {
+		t.Errorf("human-mode refusal must not emit JSON to stdout: %s", stdout)
+	}
+	if !strings.Contains(stderr, "--force") {
+		t.Errorf("refusal should hint --force on stderr: %s", stderr)
+	}
+}
+
 func TestVersionIsHumanReadableByDefault(t *testing.T) {
 	stdout, stderr, code := exec(t, "version")
 

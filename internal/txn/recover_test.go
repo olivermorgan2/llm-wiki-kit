@@ -169,7 +169,7 @@ func TestInterruptionRecoveryMatrix(t *testing.T) {
 func TestRecoverRollsBackOnDamagedPostimage(t *testing.T) {
 	root := t.TempDir()
 	canon := canonRoot(t, root)
-	seed(t, canon, "e.md", "", 0o644)         // empty existing -> restored empty, not absent
+	seed(t, canon, "e.md", "", 0o644) // empty existing -> restored empty, not absent
 	seed(t, canon, "existing.md", "old", 0o644)
 	pre := snapshot(t, canon)
 
