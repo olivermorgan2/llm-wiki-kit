@@ -4,10 +4,12 @@ _Last updated: 2026-07-03_
 
 ## Current status
 
-- **Phase 2 / Install-init: complete** (pending a **manual** milestone close —
-  merging this PR closes issue #21 and drops milestone #2 to zero open issues, but
-  Hermes/Oliver must close the milestone by hand afterward — and Oliver's async
-  ratification of ADR-006/007/009).
+- **Phase 2 / Install-init: complete; milestone #2 closed.** The closeout PR
+  #31 merged (`main` = `30cfbac`), closing issue #21 and dropping milestone #2
+  (`Phase 2 — Install/init`) to zero open issues; Hermes then closed the
+  milestone manually (state=closed, 9 closed / 0 open, closed 2026-07-03).
+  Oliver's async ratification of ADR-006/007/009 remains the one outstanding
+  flag — not a merge blocker.
 - **Next phase: Phase 3 / Authoring + staged mutation.**
 
 ## Phase 2 / Install-init — complete
@@ -23,7 +25,7 @@ multi-platform release builds + selection wiring with a per-platform selfcheck
 smoke (ADR-002); a five-platform CI test matrix; and a named, criterion-mapped
 install/init acceptance corpus that serves as the Phase 2 gate evidence.
 
-### Issues (implementation closed; closeout #21 closes on merge)
+### Issues (all closed; closeout #21 closed via PR #31)
 
 | Issue | Title | ADR |
 |-------|-------|-----|
@@ -36,7 +38,7 @@ install/init acceptance corpus that serves as the Phase 2 gate evidence.
 | #17 | Multi-platform release builds + selection shim wiring | ADR-002 |
 | #21 | Phase 2 closeout state and knowledge update | — (this PR) |
 
-### PRs (all merged; closeout PR open)
+### PRs (all merged)
 
 | PR | Merged | Closes | Merge commit |
 |----|--------|--------|--------------|
@@ -47,7 +49,7 @@ install/init acceptance corpus that serves as the Phase 2 gate evidence.
 | #26 | 2026-07-03 | #15 | `fb65639` |
 | #27 | 2026-07-03 | #20 | `a078007` |
 | #28 | 2026-07-03 | #17 | `33dd78a` |
-| _this PR_ | _pending_ | #21 | _pending_ |
+| #31 | 2026-07-03 | #21 | `30cfbac` |
 
 ### ADRs adopted
 
@@ -173,6 +175,6 @@ in the build-out plan; the `design/adr/` index preserves the 008 gap).
 - **Oliver's async ratification** of ADR-006/007/009 remains outstanding —
   recorded as a flag, consistent with the 2026-07-03 autonomous-phase mandate;
   not a merge blocker.
-- **CI on this closeout PR** will show the windows full-suite job red
-  (pre-existing) and macos-amd64 may not dispatch — the PR is docs-only;
-  merging over the red/pending matrix is Hermes's gate call.
+- **CI on the closeout PR #31** showed the windows full-suite job red
+  (pre-existing) and macos-amd64 undispatched — the PR was docs-only, and
+  Hermes merged over the red/pending matrix as the closeout gate call.

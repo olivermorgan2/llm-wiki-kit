@@ -6,7 +6,8 @@ Front door to the `llm-wiki-kit` knowledge layer. Conventions live in
 ## Current phase
 
 **Phase 1 / Foundation closed (issues #1–#6, PRs #7–#13, ADR-001–005 accepted).
-Phase 2 / Install-init closed (issues #14–#21, PRs #22–#28 + closeout PR;
+Phase 2 / Install-init closed (issues #14–#21, PRs #22–#28 + closeout PR #31;
+milestone #2 closed 2026-07-03;
 ADR-006/007/009 Codex-re-reviewed `READY` (5/5) and **accepted** 2026-07-03
 under the autonomous-phase mandate — flagged for Oliver's async ratification).**
 The install/init surface shipped: ADR-006 cross-file transaction layer (#16),
@@ -58,14 +59,14 @@ questions **Q2/Q7/Q8 closed** with ADR + log back-references. See
 ## Next action
 
 **Phase 2 / Install-init closed out 2026-07-03 (issues #14–#21, PRs #22–#28 +
-closeout PR).** The evidence artifact is [`../design/state.md`](../design/state.md)
+closeout PR #31).** The evidence artifact is [`../design/state.md`](../design/state.md)
 (merged issue/PR table, five-category validation evidence, exit-criteria
 verdict). Two caveats deferred with follow-ups: windows-amd64 full-suite RED
 (follow-up **#29**) and macos-amd64 no CI evidence (follow-up **#30**); the
 Phase 2 gate is **observed on 4/5** platforms, closed on inference for
-macos-amd64. Merging the #21 PR closes issue #21; milestone #2
-(`Phase 2 — Install/init`) then reaches zero open issues but does **not**
-auto-close — Hermes/Oliver must **manually** close it after merge.
+macos-amd64. The closeout PR **#31** merged (`main` = `30cfbac`), closing issue
+#21 and dropping milestone #2 (`Phase 2 — Install/init`) to zero open issues;
+Hermes then closed the milestone manually (9 closed / 0 open, 2026-07-03).
 
 Next moves, in order:
 
