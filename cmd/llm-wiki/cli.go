@@ -35,6 +35,14 @@ Commands:
               Use --profile <id> to select a profile (default: core) and
               --force to overwrite an existing bundle. Without --force, init
               refuses when any target file already exists (exit 3).
+  install     Install the kit's bundle into a new or non-empty repository
+              (default target: the current directory, which must already
+              exist), writing the scaffold plus a version-record manifest at
+              .llm-wiki/manifest.json through one transaction (ADR-009). Use
+              --profile <id> to select a profile (default: core), --dry-run to
+              print the full planned write set without touching the tree, and
+              --force to overwrite. Without --force, install refuses when any
+              target already exists (exit 3), losing no user file.
   validate    Validate a wiki against the OKF base and core profile. Reports
               OKF and profile findings separately at three severities
               (error/warning/suggestion). Takes an optional target directory
@@ -83,6 +91,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runVersion(stdout, jsonMode)
 	case "init":
 		return runInit(cmdArgs, stdout, stderr, jsonMode)
+	case "install":
+		return runInstall(cmdArgs, stdout, stderr, jsonMode)
 	case "validate":
 		return runValidate(cmdArgs, stdout, jsonMode)
 	case "selfcheck":
@@ -154,8 +164,9 @@ func runVersion(stdout io.Writer, jsonMode bool) int {
 // given, init mutates nothing and reports StatusApprovalRequired (exit 3), not
 // invalid-invocation. The invocation is well-formed — the operation simply
 // awaits explicit permission to overwrite — and contract.Approval is shaped for
-// exactly this; issue #19's install refusal reuses the same envelope, so exit 3
-// keeps init and install consistent. --force is the approval grant.
+// exactly this. install (ADR-009, runInstall) reuses the same envelope through
+// the shared cmdRefuse helper, so exit 3 keeps init and install consistent.
+// --force is the approval grant.
 func runInit(args []string, stdout, stderr io.Writer, jsonMode bool) int {
 	profileID := profile.CoreID
 	force := false
@@ -167,7 +178,7 @@ func runInit(args []string, stdout, stderr io.Writer, jsonMode bool) int {
 		switch {
 		case a == "--profile" || a == "-profile":
 			if i+1 >= len(args) {
-				return initInvalid(stdout, stderr, jsonMode, "--profile requires a value")
+				return cmdInvalid("init", stdout, stderr, jsonMode, "--profile requires a value")
 			}
 			i++
 			profileID = args[i]
@@ -178,10 +189,10 @@ func runInit(args []string, stdout, stderr io.Writer, jsonMode bool) int {
 		case a == "--force" || a == "-force":
 			force = true
 		case strings.HasPrefix(a, "-"):
-			return initInvalid(stdout, stderr, jsonMode, fmt.Sprintf("unknown flag %q", a))
+			return cmdInvalid("init", stdout, stderr, jsonMode, fmt.Sprintf("unknown flag %q", a))
 		default:
 			if haveTarget {
-				return initInvalid(stdout, stderr, jsonMode, fmt.Sprintf("unexpected argument %q", a))
+				return cmdInvalid("init", stdout, stderr, jsonMode, fmt.Sprintf("unexpected argument %q", a))
 			}
 			target = a
 			haveTarget = true
@@ -190,26 +201,26 @@ func runInit(args []string, stdout, stderr io.Writer, jsonMode bool) int {
 
 	p, err := profile.Resolve(profileID)
 	if err != nil {
-		return initInvalid(stdout, stderr, jsonMode, fmt.Sprintf("unknown profile %q", profileID))
+		return cmdInvalid("init", stdout, stderr, jsonMode, fmt.Sprintf("unknown profile %q", profileID))
 	}
 
 	// Init never creates the target dir: fsafe/txn require an existing boundary.
 	info, err := os.Stat(target)
 	if err != nil || !info.IsDir() {
-		return initInvalid(stdout, stderr, jsonMode, fmt.Sprintf("target %q must be an existing directory", target))
+		return cmdInvalid("init", stdout, stderr, jsonMode, fmt.Sprintf("target %q must be an existing directory", target))
 	}
 
 	changes := scaffold.Plan(p, time.Now().UTC())
 	conflicts, err := scaffold.Conflicts(target, changes)
 	if err != nil {
-		return initSystemFailure(stdout, stderr, jsonMode, err)
+		return cmdSystemFailure("init", stdout, stderr, jsonMode, err)
 	}
 	if len(conflicts) > 0 && !force {
-		return initRefuse(stdout, stderr, jsonMode, conflicts)
+		return cmdRefuse("init", stdout, stderr, jsonMode, conflicts)
 	}
 
 	if err := commitScaffold(target, changes); err != nil {
-		return initSystemFailure(stdout, stderr, jsonMode, err)
+		return cmdSystemFailure("init", stdout, stderr, jsonMode, err)
 	}
 
 	env := contract.New("init", contract.StatusSuccess)
@@ -255,10 +266,12 @@ func planTargets(changes []txn.FileChange) []string {
 	return paths
 }
 
-// initRefuse emits the approval-required refusal (exit 3): the invocation is
-// well-formed but the operation needs explicit permission to overwrite.
-func initRefuse(stdout, stderr io.Writer, jsonMode bool, conflicts []string) int {
-	env := contract.New("init", contract.StatusApprovalRequired)
+// cmdRefuse emits the approval-required refusal (exit 3) for operation op: the
+// invocation is well-formed but the operation needs explicit permission to
+// overwrite. init and install (ADR-009) share this envelope — a pre-existing
+// planned target is a conflict, and --force is the approval grant.
+func cmdRefuse(op string, stdout, stderr io.Writer, jsonMode bool, conflicts []string) int {
+	env := contract.New(op, contract.StatusApprovalRequired)
 	env.Approval = &contract.Approval{
 		Required: true,
 		Reason:   "target files already exist; re-run with --force to overwrite",
@@ -267,31 +280,33 @@ func initRefuse(stdout, stderr io.Writer, jsonMode bool, conflicts []string) int
 	if jsonMode {
 		return emit(stdout, env)
 	}
-	fmt.Fprintf(stderr, "llm-wiki: init refused — %s\n", env.Approval.Reason)
+	fmt.Fprintf(stderr, "llm-wiki: %s refused — %s\n", op, env.Approval.Reason)
 	for _, p := range conflicts {
 		fmt.Fprintf(stderr, "  %s\n", p)
 	}
 	return int(contract.ExitCodeForStatus(env.Status))
 }
 
-// initInvalid emits the invalid-invocation outcome (exit 4): JSON carries the
-// envelope; human mode explains the error and prints usage on stderr.
-func initInvalid(stdout, stderr io.Writer, jsonMode bool, msg string) int {
+// cmdInvalid emits the invalid-invocation outcome (exit 4) for operation op:
+// JSON carries the envelope; human mode explains the error and prints usage on
+// stderr.
+func cmdInvalid(op string, stdout, stderr io.Writer, jsonMode bool, msg string) int {
 	if jsonMode {
-		env := contract.New("init", contract.StatusInvalidInvocation)
+		env := contract.New(op, contract.StatusInvalidInvocation)
 		return emit(stdout, env)
 	}
 	fmt.Fprintf(stderr, "llm-wiki: %s\n\n%s", msg, usage)
 	return int(contract.ExitInvalidInvocation)
 }
 
-// initSystemFailure maps a txn/fsafe error to the system-failure bucket (exit 5).
-func initSystemFailure(stdout, stderr io.Writer, jsonMode bool, cause error) int {
-	env := contract.New("init", contract.StatusSystemFailure)
+// cmdSystemFailure maps a txn/fsafe error to the system-failure bucket (exit 5)
+// for operation op.
+func cmdSystemFailure(op string, stdout, stderr io.Writer, jsonMode bool, cause error) int {
+	env := contract.New(op, contract.StatusSystemFailure)
 	if jsonMode {
 		return emit(stdout, env)
 	}
-	fmt.Fprintf(stderr, "llm-wiki: init failed: %v\n", cause)
+	fmt.Fprintf(stderr, "llm-wiki: %s failed: %v\n", op, cause)
 	return int(contract.ExitCodeForStatus(env.Status))
 }
 
