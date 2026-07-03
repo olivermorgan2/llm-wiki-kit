@@ -2,12 +2,15 @@ name: CI
 
 # Repo-development CI for llm-wiki-kit: build, vet, and test the Go engine on
 # every one of the five ADR-002 target platforms as far as GitHub-hosted
-# runners support them, plus a cross-compile + checksum smoke that proves all
-# five binaries build and gen-checksums produces a manifest.
+# runners support them. It then builds the release bundle — all five target
+# binaries in the bin/<goos>_<goarch>/ layout plus a gen-checksums manifest —
+# and runs a per-platform selfcheck smoke that verifies each built binary
+# selects and integrity-checks itself against the bundled SHA256SUMS (positive
+# path) and fails closed on corruption (negative path).
 #
 # Scope: repo-dev CI only. This is deliberately NOT the shipped user-facing
 # conformance workflow (Phase 6, ADR-011) and does no release publishing,
-# signing, or provenance.
+# signing, provenance, or marketplace packaging — those remain deferred.
 
 on:
   push:
@@ -75,8 +78,8 @@ jobs:
       - name: go test
         run: go test ./...
 
-  cross-compile-smoke:
-    name: cross-compile smoke (5 platforms)
+  build-bundle:
+    name: build bundle + checksums (5 platforms)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -90,22 +93,27 @@ jobs:
 
       - name: Cross-compile all five target binaries
         shell: bash
-        env:
-          CGO_ENABLED: "0"
         run: |
           set -euo pipefail
           # Keys mirror internal/platform.Platform.ArtifactPath:
-          # bin/<goos>_<goarch>/llm-wiki[.exe].
+          # bin/<goos>_<goarch>/llm-wiki[.exe]. CGO_ENABLED=0 is set explicitly
+          # on each build command so every target is a static, portable binary
+          # with no libc linkage — this is what the platform-selection contract
+          # documents and it keeps checksums deterministic across runners.
+          # -trimpath keeps the binaries (and therefore their checksums)
+          # independent of the runner's workspace path. Version stamping via
+          # -ldflags is deliberately left to the release pipeline (cli.go),
+          # which is out of scope here.
           targets=("darwin amd64" "darwin arm64" "linux amd64" "linux arm64" "windows amd64")
           for t in "${targets[@]}"; do
             read -r goos goarch <<<"$t"
             out="bin/${goos}_${goarch}/llm-wiki"
             [ "$goos" = "windows" ] && out="${out}.exe"
             echo "building $out"
-            GOOS="$goos" GOARCH="$goarch" go build -o "$out" ./cmd/llm-wiki
+            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" go build -trimpath -o "$out" ./cmd/llm-wiki
           done
 
-      - name: Generate checksum manifest (smoke)
+      - name: Generate checksum manifest
         run: go run ./cmd/gen-checksums -root .
 
       - name: Verify manifest lists all five platforms
@@ -123,3 +131,74 @@ jobs:
           name: cross-compiled-bundle
           path: bin/
           retention-days: 7
+
+  selfcheck-smoke:
+    name: selfcheck smoke (${{ matrix.name }})
+    needs: build-bundle
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      # Same rationale as the test matrix: report every platform's smoke even
+      # when one leg fails.
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-arm64
+            runner: macos-14
+            key: darwin_arm64
+            exe: llm-wiki
+          - name: macos-amd64
+            runner: macos-13
+            key: darwin_amd64
+            exe: llm-wiki
+          - name: linux-amd64
+            runner: ubuntu-24.04
+            key: linux_amd64
+            exe: llm-wiki
+          - name: linux-arm64
+            runner: ubuntu-24.04-arm
+            key: linux_arm64
+            exe: llm-wiki
+          - name: windows-amd64
+            runner: windows-2022
+            key: windows_amd64
+            exe: llm-wiki.exe
+    steps:
+      # No checkout / no setup-go: this job only consumes the built bundle and
+      # runs the shipped binary. That keeps it fast and proves the bundle is
+      # self-contained. download-artifact reconstructs bin/SHA256SUMS and the
+      # per-key dirs at the workspace root, matching `selfcheck --root .`.
+      - name: Download built bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: cross-compiled-bundle
+          path: bin
+
+      - name: Selfcheck (positive — selection + integrity)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin="bin/${{ matrix.key }}/${{ matrix.exe }}"
+          # upload-artifact@v4 zips content and strips exec bits; restore them.
+          # chmod changes mode only, not content, so checksums stay valid.
+          chmod +x "$bin"
+          out="$("$bin" selfcheck --root .)"
+          echo "$out"
+          # Selection-shim wiring proof: the verified artifact is THIS leg's key,
+          # i.e. platform.Detect picked bin/<key>/llm-wiki[.exe] on this runner.
+          echo "$out" | grep -F "verified bin/${{ matrix.key }}/${{ matrix.exe }}"
+          # Envelope is indented JSON, so the status line carries a space.
+          "$bin" selfcheck --root . --json | grep -F '"status": "success"'
+
+      - name: Selfcheck (negative — fail-closed on corruption)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin="bin/${{ matrix.key }}/${{ matrix.exe }}"
+          # Append one byte to flip the artifact's checksum: selfcheck must
+          # reject it with the contract's system-or-filesystem-failure (exit 5).
+          # This guards against a smoke that "passes" by degenerating to a no-op.
+          printf 'x' >> "$bin"
+          rc=0
+          "$bin" selfcheck --root . || rc=$?
+          echo "corrupted-artifact selfcheck exit code: $rc (expect 5)"
+          test "$rc" -eq 5

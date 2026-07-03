@@ -1,9 +1,9 @@
 // Command gen-checksums is the local developer/CI tool that produces the
 // bin/SHA256SUMS manifest ADR-002 requires: it walks the per-platform binaries
 // under <root>/bin, computes each file's SHA-256, and writes the manifest the
-// engine's selfcheck gate consumes. It is deliberately small and offline; the
-// full multi-platform release pipeline (building the five binaries) is deferred
-// to a later infra issue.
+// engine's selfcheck gate consumes. It is deliberately small and offline: CI's
+// bundle job builds the five target binaries and runs this tool to produce the
+// manifest (#17), while it stays usable locally and without network access.
 package main
 
 import (
