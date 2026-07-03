@@ -1,6 +1,6 @@
 # ADR-008: Provenance and citation model (context-based, deterministic offline resolution)
 
-**Status:** proposed
+**Status:** accepted
 **Date:** 2026-07-03
 
 ## Context

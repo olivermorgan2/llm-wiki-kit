@@ -22,7 +22,7 @@ outside the fences is preserved.
 | [ADR-005](adr-005-safe-filesystem-layer.md) | Mandatory engine filesystem-safety gate | accepted |
 | [ADR-006](adr-006-staged-mutation-transaction-model.md) | Staged mutation lifecycle and cross-file transaction model | accepted |
 | [ADR-007](adr-007-profile-system-boundary.md) | Data-driven profile system with one inheritance level | accepted |
-| [ADR-008](adr-008-provenance-and-citation-model.md) | Provenance and citation model (context-based, deterministic offline resolution) | proposed |
+| [ADR-008](adr-008-provenance-and-citation-model.md) | Provenance and citation model (context-based, deterministic offline resolution) | accepted |
 | [ADR-009](adr-009-install-upgrade-uninstall-ownership.md) | Install / upgrade / uninstall asset-ownership model | accepted |
 
 <!-- adr-index:end -->
