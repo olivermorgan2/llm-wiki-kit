@@ -1,25 +1,60 @@
-# academic-research profile — the initial domain value proposition (PRD §11,
-# addendum 003), one inheritance level over core (ADR-007).
+# academic-research profile — the initial domain value proposition (PRD §11),
+# one inheritance level over core (ADR-007). This is the full addendum-003
+# contract expressed in the ADR-010 closed schema. It ADDS types and TIGHTENS
+# source/synthesis; it never relaxes a core rule (core's engine-owned rules run
+# on every page regardless of profile).
 #
-# MINIMAL at this stage (issue #54 / I2): this file ships only the profile header
-# so the data-backed loader can resolve `academic-research` and prove the
-# `extends: core` merge. The full addendum-003 contract — the five added/tightened
-# page types (source, claim, method, question, synthesis), their required fields,
-# enums, list-min, required sections, recommended pairs, and citation obligations,
-# per the ADR-010 schema — is filled in by issue #57 (I5) alongside the per-type
-# valid/invalid fixture corpus. The type-conditional rule engine (#55/I3) and the
-# citation obligations (#56/I4) are tested against synthetic profiles until then.
+# Per-type `required`/`recommended` list only the fields this profile adds beyond
+# core-required (type/title/description) and core-recommended
+# (timestamp/tags/aliases/resource). Advisory items addendum 003 mentions but does
+# not gate — a source summary section, synthesis links, publication_date being ISO
+# 8601 — are not encoded here (ADR-010: the schema expresses only gated rules).
 profile:
   id: academic-research
   version: "1.0"
   extends: core
 
-# Filled in by #57 (I5): per-type required/recommended/enums/listMin/
-# recommendedAnyOf/requiredSections/evidenceSections/citation for
-# source | claim | method | question | synthesis.
-types: {}
+types:
+  # source (tightened over core): a bibliographic record.
+  source:
+    required: [authors, source_type]
+    recommended: [publication_date, review_status]
+    enums:
+      source_type: [paper, preprint, book, dataset, webpage, report, other]
+      review_status: [unreviewed, in-review, reviewed]
+    listMin:
+      authors: 1
+    recommendedAnyOf:
+      - [doi, canonical_url] # >=1 recommended; neither present → suggestion
 
-# academic-research uses the rule-kind default severities (they already match
-# addendum 003's severity table), so no overrides are needed. The key exists so
-# the vocabulary is complete against ADR-008 sub-decision 5(d).
+  # claim (new): an assessed proposition with evidence.
+  claim:
+    required: [confidence, assessment]
+    enums:
+      confidence: [low, medium, high]
+      assessment: [supported, contested, refuted, open]
+    requiredSections: [Evidence, Counterevidence, Assessment]
+    evidenceSections: [Evidence]
+    citation:
+      requireWhen: { assessment: supported } # supported ⇒ needs a citation
+      forbiddenTargetTypes: [question]        # a question is never evidence
+
+  # method (new): a described approach with its trade-offs.
+  method:
+    requiredSections: [Assumptions, Strengths, Limitations]
+
+  # question (new — workflow state, not evidence).
+  question:
+    required: [status]
+    enums:
+      status: [open, answered, abandoned]
+    requiredSections: [Evidence gap]
+
+  # synthesis (tightened over core): a cross-claim/source integration.
+  synthesis:
+    requiredSections: [Scope, Findings, Agreement, Disagreement, "Evidence gaps"]
+
+# No per-rule severity overrides: the rule-kind defaults already match addendum
+# 003's severity table (missing required section = error; source with neither
+# doi nor canonical_url = suggestion; supported claim without a citation = error).
 severities: {}
