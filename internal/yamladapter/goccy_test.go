@@ -63,15 +63,54 @@ func TestUnmarshalMalformedYAMLReturnsError(t *testing.T) {
 	}
 }
 
-// Marshal is a documented not-implemented stub in this issue; round-trip
-// preservation (criterion 6) is Slice 2. It must return a clear error rather
-// than silently producing lossy output.
-func TestMarshalIsNotImplemented(t *testing.T) {
-	_, err := New().Marshal(map[string]any{"type": "concept"})
-	if err == nil {
-		t.Fatal("Marshal stub returned nil error, want not-implemented error")
+// Marshal encodes a value back to YAML (criterion 6 groundwork for page plan).
+func TestMarshalEncodesValue(t *testing.T) {
+	out, err := New().Marshal(map[string]any{"type": "concept"})
+	if err != nil {
+		t.Fatalf("Marshal returned error: %v", err)
 	}
-	if !strings.Contains(strings.ToLower(err.Error()), "not implemented") {
-		t.Errorf("Marshal error = %q, want it to mention 'not implemented'", err.Error())
+	if !strings.Contains(string(out), "type: concept") {
+		t.Errorf("Marshal output = %q, want it to contain 'type: concept'", out)
+	}
+}
+
+// An OrderedMap round-trips: decoding YAML into one and marshaling it back
+// preserves key order and every field, including ones the engine does not model
+// (unknown-field preservation, ADR-001 criterion 6). This is the property page
+// plan relies on so unknown frontmatter survives the staged-mutation cycle.
+func TestOrderedMapRoundTripPreservesUnknownFields(t *testing.T) {
+	src := "title: Alpha\ntype: concept\ncustom_field: keep-me\nnested:\n  a: 1\n  b: two\n"
+	a := New()
+
+	var m OrderedMap
+	if err := a.Unmarshal([]byte(src), &m); err != nil {
+		t.Fatalf("Unmarshal into OrderedMap: %v", err)
+	}
+	out, err := a.Marshal(m)
+	if err != nil {
+		t.Fatalf("Marshal OrderedMap: %v", err)
+	}
+
+	got := string(out)
+	for _, field := range []string{"title: Alpha", "type: concept", "custom_field: keep-me"} {
+		if !strings.Contains(got, field) {
+			t.Errorf("round-trip dropped %q:\n%s", field, got)
+		}
+	}
+	// Key order is preserved: title precedes type precedes custom_field.
+	if ti, tj := strings.Index(got, "title"), strings.Index(got, "type"); ti < 0 || tj < 0 || ti > tj {
+		t.Errorf("key order not preserved (title should precede type):\n%s", got)
+	}
+	// Re-marshaling the round-tripped output is a fixed point (idempotent).
+	var m2 OrderedMap
+	if err := a.Unmarshal(out, &m2); err != nil {
+		t.Fatalf("re-unmarshal: %v", err)
+	}
+	out2, err := a.Marshal(m2)
+	if err != nil {
+		t.Fatalf("re-marshal: %v", err)
+	}
+	if string(out2) != got {
+		t.Errorf("round-trip not idempotent:\n first: %q\nsecond: %q", got, out2)
 	}
 }

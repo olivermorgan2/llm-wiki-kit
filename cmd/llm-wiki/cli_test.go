@@ -34,15 +34,21 @@ func decodeEnvelope(t *testing.T, stdout string) contract.Envelope {
 		}
 	}
 	// The six ADR-003 fields are always present; page-scoped operations add
-	// exactly one optional seventh field, "page", and nothing else.
+	// exactly one optional seventh payload field — "page" (inspect) or "plan"
+	// (plan) — and nothing else.
 	switch len(generic) {
 	case 6:
 	case 7:
-		if _, ok := generic["page"]; !ok {
-			t.Errorf("7-field envelope's only permitted extra is \"page\": %s", stdout)
+		_, hasPage := generic["page"]
+		_, hasPlan := generic["plan"]
+		if !hasPage && !hasPlan {
+			t.Errorf("7-field envelope's only permitted extra is \"page\" or \"plan\": %s", stdout)
+		}
+		if hasPage && hasPlan {
+			t.Errorf("envelope must not carry both \"page\" and \"plan\": %s", stdout)
 		}
 	default:
-		t.Errorf("envelope must carry 6 fields (or 7 with page), got %d: %s", len(generic), stdout)
+		t.Errorf("envelope must carry 6 fields (or 7 with page/plan), got %d: %s", len(generic), stdout)
 	}
 	var env contract.Envelope
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {

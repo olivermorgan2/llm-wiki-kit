@@ -60,6 +60,15 @@ Commands:
               page; LLM_WIKI_SEVERITY overrides apply as with validate. The
               path must resolve to a regular .md file inside the bundle
               boundary; a path escaping the boundary is refused (exit 5).
+  page plan   Preview a whole-page change without mutating the live tree
+              (ADR-006). Reads the proposed page content from --content <file>
+              (or stdin when the flag is omitted or set to "-"), normalizes its
+              frontmatter so unknown fields survive, binds the source/target
+              base hash (an absent sentinel for a new page), and prints a unified
+              diff. The change set is staged under .llm-wiki/staging/<txn-id>/
+              for a later apply; nothing is committed. When the proposed content
+              already matches the live page the plan is a no-op and stages
+              nothing. Takes <path> and --root like page inspect.
   selfcheck   Verify this platform's shipped binary against its bundled
               checksum (ADR-002). Use --root <dir> to point at the bundle;
               defaults to the directory containing the running executable.
@@ -361,12 +370,14 @@ func runValidate(args []string, stdout io.Writer, jsonMode bool) int {
 // page subcommand follows.
 func runPage(args []string, stdout, stderr io.Writer, jsonMode bool) int {
 	if len(args) == 0 {
-		return cmdInvalid("page", stdout, stderr, jsonMode, "page requires a subcommand (inspect)")
+		return cmdInvalid("page", stdout, stderr, jsonMode, "page requires a subcommand (inspect, plan)")
 	}
 	sub, subArgs := args[0], args[1:]
 	switch sub {
 	case "inspect":
 		return runPageInspect(subArgs, stdout, stderr, jsonMode)
+	case "plan":
+		return runPagePlan(subArgs, stdout, stderr, jsonMode)
 	default:
 		return cmdInvalid("page", stdout, stderr, jsonMode, fmt.Sprintf("unknown page subcommand %q", sub))
 	}
@@ -451,6 +462,125 @@ func runPageInspect(args []string, stdout, stderr io.Writer, jsonMode bool) int 
 		fmt.Fprintf(stdout, "  [%s/%s] %s: %s (%s)\n", f.Ruleset, f.Severity, f.Code, f.Message, f.Path)
 	}
 	return int(contract.ExitCodeForStatus(env.Status))
+}
+
+// runPagePlan previews a whole-page change without mutating the live tree
+// (ADR-006). It parses its own flags in the hand-rolled runPageInspect style:
+// --root/--root=<dir> (default "."), --content/--content=<file> for the proposed
+// page (default stdin, or "-"), and exactly one positional <path>. It reads the
+// proposed content, delegates to plan.Plan (which normalizes frontmatter through
+// the yamladapter round-trip, binds the base hash, stages the change under
+// .llm-wiki/staging/<txn-id>/, and renders a unified diff), and maps the
+// substrate's outcomes to the contract: a boundary escape is a system failure
+// (exit 5); a non-.md path, a non-regular target, or a bad invocation is
+// invalid-invocation (exit 4). A successful plan — staged change or no-op —
+// emits the standard envelope plus the plan payload.
+func runPagePlan(args []string, stdout, stderr io.Writer, jsonMode bool) int {
+	root := "."
+	content := ""
+	haveContent := false
+	var pagePath string
+	havePath := false
+
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--root" || a == "-root":
+			if i+1 >= len(args) {
+				return cmdInvalid("page plan", stdout, stderr, jsonMode, "--root requires a value")
+			}
+			i++
+			root = args[i]
+		case strings.HasPrefix(a, "--root="):
+			root = strings.TrimPrefix(a, "--root=")
+		case strings.HasPrefix(a, "-root="):
+			root = strings.TrimPrefix(a, "-root=")
+		case a == "--content" || a == "-content":
+			if i+1 >= len(args) {
+				return cmdInvalid("page plan", stdout, stderr, jsonMode, "--content requires a value")
+			}
+			i++
+			content, haveContent = args[i], true
+		case strings.HasPrefix(a, "--content="):
+			content, haveContent = strings.TrimPrefix(a, "--content="), true
+		case strings.HasPrefix(a, "-content="):
+			content, haveContent = strings.TrimPrefix(a, "-content="), true
+		case strings.HasPrefix(a, "-"):
+			return cmdInvalid("page plan", stdout, stderr, jsonMode, fmt.Sprintf("unknown flag %q", a))
+		default:
+			if havePath {
+				return cmdInvalid("page plan", stdout, stderr, jsonMode, fmt.Sprintf("unexpected argument %q", a))
+			}
+			pagePath, havePath = a, true
+		}
+	}
+
+	if !havePath {
+		return cmdInvalid("page plan", stdout, stderr, jsonMode, "page plan requires a <path> argument")
+	}
+
+	proposed, err := readProposedContent(content, haveContent)
+	if err != nil {
+		return cmdInvalid("page plan", stdout, stderr, jsonMode, fmt.Sprintf("cannot read proposed content: %v", err))
+	}
+
+	result, err := plan.Plan(root, pagePath, proposed, yamladapter.New())
+	if err != nil {
+		switch {
+		case errors.Is(err, plan.ErrNotMarkdown):
+			return cmdInvalid("page plan", stdout, stderr, jsonMode, fmt.Sprintf("%q is not a markdown page", pagePath))
+		case errors.Is(err, plan.ErrTargetNotRegular), errors.Is(err, txn.ErrNonRegularTarget),
+			errors.Is(err, txn.ErrReservedPath):
+			return cmdInvalid("page plan", stdout, stderr, jsonMode, fmt.Sprintf("cannot plan over %q: %v", pagePath, err))
+		case errors.Is(err, fsafe.ErrOutsideBoundary), errors.Is(err, fsafe.ErrSymlinkEscape):
+			// Boundary escape maps to system-failure per fsafe's documented rule.
+			return cmdSystemFailure("page plan", stdout, stderr, jsonMode, err)
+		default:
+			return cmdSystemFailure("page plan", stdout, stderr, jsonMode, err)
+		}
+	}
+
+	env := contract.New("page plan", contract.StatusSuccess)
+	if !result.NoOp {
+		env.AffectedPaths = []string{result.Path}
+	}
+	env.Plan = &contract.PagePlan{
+		Path:        result.Path,
+		NoOp:        result.NoOp,
+		Transaction: result.TxnID,
+		BaseAbsent:  result.BaseAbsent,
+		BaseHash:    result.BaseHash,
+		StagedHash:  result.StagedHash,
+		Diff:        result.Diff,
+	}
+
+	if jsonMode {
+		return emit(stdout, env)
+	}
+	if result.NoOp {
+		fmt.Fprintf(stdout, "page plan: no changes — %s\n", result.Path)
+		return int(contract.ExitCodeForStatus(env.Status))
+	}
+	base := "sha256 " + result.BaseHash
+	if result.BaseAbsent {
+		base = "absent (new page)"
+	}
+	fmt.Fprintf(stdout, "page plan: staged change — %s\n", result.Path)
+	fmt.Fprintf(stdout, "  txn:    %s\n", result.TxnID)
+	fmt.Fprintf(stdout, "  base:   %s\n", base)
+	fmt.Fprintf(stdout, "  staged: sha256 %s\n", result.StagedHash)
+	fmt.Fprint(stdout, result.Diff)
+	return int(contract.ExitCodeForStatus(env.Status))
+}
+
+// readProposedContent loads the proposed page bytes: from the --content file
+// when a real path was given, or from stdin when the flag was omitted or set to
+// "-" (the pipe convention).
+func readProposedContent(content string, haveContent bool) ([]byte, error) {
+	if !haveContent || content == "-" {
+		return io.ReadAll(os.Stdin)
+	}
+	return os.ReadFile(content)
 }
 
 // runSelfcheck detects the running platform and verifies its shipped binary

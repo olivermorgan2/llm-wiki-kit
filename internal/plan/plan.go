@@ -1,9 +1,12 @@
-// Package plan is the read-only page addressing/load/parse/report substrate for
-// the Phase 3 page commands (ADR-006). Issue #42 lands its first, read-only
-// half — the `page inspect` report — and `page plan`/`page apply` reuse the
-// same addressing and hashing here rather than reimplementing them.
+// Package plan is the page addressing/load/parse/report substrate for the Phase
+// 3 page commands (ADR-006). Issue #42 landed its first, read-only half — the
+// `page inspect` report — and `page plan` (Plan, in pageplan.go) builds on the
+// same addressing and hashing to stage a whole-page change set: it never mutates
+// live files, staging the proposed content under .llm-wiki/staging/<txn-id>/ via
+// the ADR-006 transaction and rendering a unified diff preview. `page apply`
+// reuses this addressing and hashing rather than reimplementing them.
 //
-// The substrate does three things: it resolves a user-supplied page path to a
+// The read-only substrate does three things: it resolves a user-supplied page path to a
 // bundle-relative address through the ADR-005 fsafe boundary gate (so no path
 // outside the bundle is ever read), it captures the page's content hash
 // (lowercase-hex SHA-256, the base-hash input ADR-006 plan/apply binds
