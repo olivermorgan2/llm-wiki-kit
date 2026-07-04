@@ -61,7 +61,8 @@ func TestApplyCommitsPreviewedPage(t *testing.T) {
 }
 
 // Apply after an out-of-band edit to the target is a stale-plan rejection: the
-// tree is left bit-identical and staging is discarded (criterion 13).
+// tree is left bit-identical and the staged plan is retained so a re-apply
+// rejects identically rather than vanishing (criterion 13).
 func TestApplyStalePlanRejectedZeroMutation(t *testing.T) {
 	root := t.TempDir()
 	live := writePage(t, root, "wiki/keep.md", validPage)
