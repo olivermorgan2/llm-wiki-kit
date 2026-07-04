@@ -14,6 +14,7 @@ import (
 	"path"
 
 	"github.com/olivermorgan2/llm-wiki-kit/internal/contract"
+	"github.com/olivermorgan2/llm-wiki-kit/internal/profile"
 	"github.com/olivermorgan2/llm-wiki-kit/internal/yamladapter"
 )
 
@@ -40,6 +41,11 @@ type Options struct {
 	// sub-decision 3). nil means no `.llm-wiki/` anchor: the repo-path class is
 	// empty and every bundle-escaping target is malformed.
 	RepoResolve func(string) RepoStatus
+	// Profile is the resolved active profile (ADR-007/ADR-010). Its per-type rules
+	// drive the type-conditional structural findings (profile-*). The zero value
+	// (no Types) runs no profile rules, so a core-profile bundle validates exactly
+	// as before Phase 4 (golden parity, ADR-010 sub-decision 2).
+	Profile profile.Profile
 }
 
 // New returns a validation Engine that decodes YAML through the given adapter,
@@ -97,11 +103,20 @@ func (e *Engine) Run(fsys fs.FS) []contract.Finding {
 	}
 	for _, pg := range pages {
 		out = append(out, evaluatePage(e.yaml, pg.path, pg.content)...)
-		// Link and citation resolution need the page body; a page whose
-		// frontmatter fails to split already yields okf-yaml-parse and has no
-		// link/citation findings (the parse-failure gate is inherited).
-		if _, body, err := splitFrontmatter(pg.content); err == nil {
+		// Link/citation resolution and the profile type rules need the page body
+		// and frontmatter; a page whose frontmatter fails to split already yields
+		// okf-yaml-parse and gets none of them (the parse-failure gate is
+		// inherited). splitFrontmatter is re-run here rather than threaded out of
+		// evaluatePage so evaluatePage's signature — and its many unit-test call
+		// sites — stay unchanged.
+		if fm, body, err := splitFrontmatter(pg.content); err == nil {
 			out = append(out, linkRules(pg.path, body, res, e.opts.EvidenceSections)...)
+			// Profile type rules run only over frontmatter that also parses as YAML
+			// (the same gate evaluatePage applies before emitting core findings).
+			var m map[string]any
+			if e.yaml.Unmarshal(fm, &m) == nil {
+				out = append(out, profileTypeFindings(e.opts.Profile, pg.path, m, body)...)
+			}
 		}
 	}
 	return out

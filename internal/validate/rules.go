@@ -42,6 +42,17 @@ const (
 	// warning default is promotable via LLM_WIKI_SEVERITY, though the gate itself
 	// is the approval requirement, not the severity.
 	CodeCitationLoss = "core-citation-loss" // warning
+
+	// Profile-data-driven rule codes (ADR-010 sub-decision 3/6). These are the
+	// generic profile-* rule kinds the engine owns; a profile supplies only their
+	// data (per-type required/enums/listMin/requiredSections/recommendedAnyOf).
+	// All are tagged ruleset:profile and fire only for a page whose frontmatter
+	// `type` is a profiled type (unknown types stay accepted, sub-decision 5).
+	codeProfileRequiredField   = "profile-required-field"   // error
+	codeProfileFieldEnum       = "profile-field-enum"       // error
+	codeProfileListMin         = "profile-list-min"         // error
+	codeProfileRequiredSection = "profile-required-section" // error
+	codeProfileRecommendedPair = "profile-recommended-pair" // suggestion
 )
 
 // evaluatePage runs the OKF and core-profile rules over one page and returns
