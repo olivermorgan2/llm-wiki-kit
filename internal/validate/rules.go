@@ -34,6 +34,14 @@ const (
 	codeCoreCitationMalformed  = "core-citation-malformed"  // warning
 	codeCoreCitationUnresolved = "core-citation-unresolved" // warning
 	codeCoreCitationDuplicate  = "core-citation-duplicate"  // suggestion
+
+	// CodeCitationLoss is the plan-time citation-preservation finding (ADR-008
+	// sub-decision 6): a staged page edit that drops an existing evidence-context
+	// citation raises it and gates apply through the ADR-003 approval member. It
+	// is exported because internal/plan and the CLI reference it directly; its
+	// warning default is promotable via LLM_WIKI_SEVERITY, though the gate itself
+	// is the approval requirement, not the severity.
+	CodeCitationLoss = "core-citation-loss" // warning
 )
 
 // evaluatePage runs the OKF and core-profile rules over one page and returns

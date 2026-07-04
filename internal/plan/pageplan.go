@@ -2,6 +2,7 @@ package plan
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/olivermorgan2/llm-wiki-kit/internal/fsafe"
 	"github.com/olivermorgan2/llm-wiki-kit/internal/txn"
+	"github.com/olivermorgan2/llm-wiki-kit/internal/validate"
 	"github.com/olivermorgan2/llm-wiki-kit/internal/yamladapter"
 )
 
@@ -40,6 +42,12 @@ type PlanResult struct {
 	Staged     []byte
 	StagedHash string
 	Diff       string
+	// LostCitations names the existing evidence-context citation targets the
+	// staged edit drops (ADR-008 sub-decision 6), in source order with first-seen
+	// spelling. It is nil unless the plan raised the citation-loss approval gate;
+	// when non-nil, Plan has written the approval sidecar into the staging dir so
+	// a later apply refuses the removal until it is approved.
+	LostCitations []string
 }
 
 // Plan builds a staged whole-page change set for target (relative to root, or an
@@ -56,7 +64,14 @@ type PlanResult struct {
 // not committed — Plan mutates no live file. A boundary escape passes through
 // the fsafe sentinel unwrapped; a non-.md path is ErrNotMarkdown; an existing
 // non-regular target is ErrTargetNotRegular.
-func Plan(root, target string, proposed []byte, yaml yamladapter.Adapter) (*PlanResult, error) {
+//
+// opts carries the ADR-008 citation-resolution configuration (evidence sections
+// + repo-path anchor). When it designates evidence contexts and the staged edit
+// drops an existing citation target from them, Plan records the loss in
+// LostCitations and writes the ADR-003 approval sidecar into the staged
+// transaction so a later apply refuses the removal until it is approved. An empty
+// opts (the zero value) never gates: it is byte-identical to the pre-#37 plan.
+func Plan(root, target string, proposed []byte, yaml yamladapter.Adapter, opts validate.Options) (*PlanResult, error) {
 	if filepath.Ext(target) != ".md" {
 		return nil, ErrNotMarkdown
 	}
@@ -95,6 +110,20 @@ func Plan(root, target string, proposed []byte, yaml yamladapter.Adapter) (*Plan
 		return result, nil
 	}
 
+	// Citation-loss detection (ADR-008 sub-decision 6): compare the source and
+	// staged evidence-context citation sets. Only an edit over an existing page
+	// can lose an existing citation; a new page has none. If either side's
+	// frontmatter fails to split, loss detection is skipped — the parse-failure
+	// gate (ADR-004) is inherited, exactly as the validate engine does.
+	var lost []string
+	if !baseAbsent {
+		if _, srcBody, ok := splitFrontmatter(existing); ok {
+			if _, stagedBody, ok2 := splitFrontmatter(staged); ok2 {
+				lost = validate.CitationLoss(srcBody, stagedBody, opts)
+			}
+		}
+	}
+
 	tx, err := txn.Begin(root, []txn.FileChange{{Target: rel, Data: staged, Mode: mode}})
 	if err != nil {
 		return nil, err
@@ -103,12 +132,55 @@ func Plan(root, target string, proposed []byte, yaml yamladapter.Adapter) (*Plan
 	// durable preview a later apply consumes. No live file has been touched.
 	result.TxnID = tx.ID()
 
+	// A raised gate must be durable: write the approval sidecar into the staging
+	// dir so apply refuses the removal until approved. A failed write aborts the
+	// transaction rather than staging a gateless plan — a gate is never silently
+	// lost (mirrors readApprovalRecord's strictness).
+	if len(lost) > 0 {
+		if err := writeApprovalSidecar(tx, rel, lost); err != nil {
+			_ = tx.Abort()
+			return nil, err
+		}
+		result.LostCitations = lost
+	}
+
 	oldLabel := devNull
 	if !baseAbsent {
 		oldLabel = "a/" + rel
 	}
 	result.Diff = unifiedDiff(oldLabel, "b/"+rel, existing, staged)
 	return result, nil
+}
+
+// writeApprovalSidecar records a citation-loss approval requirement as the
+// ADR-003 approval sidecar co-located with the staged transaction. Its presence
+// is what makes a later apply refuse until approval is granted; the record's
+// version, reason (naming the lost targets), and affected path are read back by
+// readApprovalRecord. The file is written 0644 with the same schema the apply
+// side already validates.
+func writeApprovalSidecar(tx *txn.Txn, rel string, lost []string) error {
+	rec := ApprovalRecord{
+		Version: approvalVersion,
+		Reason:  CitationLossReason(lost),
+		Paths:   []string{rel},
+	}
+	data, err := json.Marshal(rec)
+	if err != nil {
+		return fmt.Errorf("plan: encode approval record: %w", err)
+	}
+	sidecar := filepath.Join(tx.StagingDir(), ApprovalFileName)
+	if err := os.WriteFile(sidecar, data, 0o644); err != nil {
+		return fmt.Errorf("plan: write approval record: %w", err)
+	}
+	return nil
+}
+
+// CitationLossReason is the single human-readable reason string shared by the
+// approval sidecar and the plan envelope's approval member, so the requirement a
+// plan raises reads identically at plan time and at apply refusal. It is exported
+// so the CLI builds the envelope's approval reason from the same source.
+func CitationLossReason(lost []string) string {
+	return "citation loss: " + strings.Join(lost, ", ")
 }
 
 // captureTargetBase reads the plan target's pre-commit state at abs: absent (a

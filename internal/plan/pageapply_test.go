@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/olivermorgan2/llm-wiki-kit/internal/txn"
+	"github.com/olivermorgan2/llm-wiki-kit/internal/validate"
 	"github.com/olivermorgan2/llm-wiki-kit/internal/yamladapter"
 )
 
@@ -15,7 +16,7 @@ import (
 // transaction id its later apply consumes.
 func stageNewPagePlan(t *testing.T, root, rel, content string) string {
 	t.Helper()
-	res, err := Plan(root, rel, []byte(content), yamladapter.New())
+	res, err := Plan(root, rel, []byte(content), yamladapter.New(), validate.Options{})
 	if err != nil {
 		t.Fatalf("Plan(%s): %v", rel, err)
 	}
@@ -69,7 +70,7 @@ func TestApplyStalePlanRejectedZeroMutation(t *testing.T) {
 
 	// Plan an edit over the existing page.
 	edited := validPage + "\nAdded paragraph.\n"
-	res, err := Plan(root, "wiki/keep.md", []byte(edited), yamladapter.New())
+	res, err := Plan(root, "wiki/keep.md", []byte(edited), yamladapter.New(), validate.Options{})
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}

@@ -10,17 +10,19 @@ _Last updated: 2026-07-04_
   (#32); `page inspect` read-only report (#42, PR #43); `page plan` staged
   whole-page preview (#34, PR #44); `page apply` journaled commit with
   stale-plan rejection + generic ADR-003 approval-refusal plumbing (#35,
-  PR #45). `main` = `04c358b`.
-- **Current issue: #36 — citation mechanism: evidence contexts, offline
-  resolver, core-citation findings.** Extends `internal/validate` into
-  ADR-008's shared three-class offline resolver (http(s) syntactic validity,
-  in-bundle membership, repo-relative `stat` bounded by the nearest
-  `.llm-wiki/` anchor with bundle-root fallback), the deliberate `../`
-  navigational widening, evidence-context splitting, and the
-  `core-citation-{malformed,unresolved,duplicate}` findings. Out of scope:
-  the citation-loss approval gate (#37), authoring adapter (#38), acceptance
-  fixtures (#39), Phase 4 profile vocabulary, and all network I/O. Phase 3
-  stays **open**.
+  PR #45); citation mechanism — evidence contexts, offline three-class
+  resolver, `core-citation-{malformed,unresolved,duplicate}` findings (#36,
+  PR #46). `main` = `7a5f17a`.
+- **Current issue: #37 — citation-loss approval gate for page plans.**
+  Implements ADR-008 sub-decision 6: `page plan` computes the citation-loss
+  diff (normalized evidence-context citation-target sets, source vs staged),
+  emits a `core-citation-loss` finding, and writes the ADR-003 approval
+  sidecar so `page apply` refuses the unapproved removal with exit 3 until
+  `--approve`. Builds on #36's resolver and #44/#45's generic approval
+  plumbing (the trigger that writes the sidecar). Out of scope: authoring
+  adapter (#38), acceptance fixtures (#39), Phase 3 closeout (#40), Phase 4
+  profile vocabulary, new envelope fields, and all network I/O. Phase 3 stays
+  **open**.
 - **Phase 2 / Install-init: complete; milestone #2 closed** (closeout PR #31,
   milestone closed manually 2026-07-03). Oliver's async ratification of
   ADR-006/007/009 and ADR-008 remains the one outstanding flag — not a merge
@@ -171,12 +173,12 @@ Goal: the thinnest end-to-end "create real value" path — author a new page
 through the staged, preview-before-write workflow (`page inspect` / `page plan`
 / `page apply` with hash-bound, stale-rejecting plans; authoring skill adapter).
 
-Progress: `page inspect` (#42), `page plan` (#34), and `page apply` (#35)
-merged. The citation mechanism (#36) — ADR-008's core resolver + evidence
-contexts + `core-citation-*` findings — is the current issue, running
-parallel to the page spine. Remaining Phase 3 work after #36: citation-loss
-approval trigger (#37), authoring skill adapter (#38), acceptance-corpus
-expansion (#39).
+Progress: `page inspect` (#42), `page plan` (#34), `page apply` (#35), and the
+citation mechanism (#36) — ADR-008's core resolver + evidence contexts +
+`core-citation-*` findings — are merged. The citation-loss approval gate (#37)
+— ADR-008 sub-decision 6's plan-time loss diff wired through ADR-003's approval
+member — is the current issue. Remaining Phase 3 work after #37: authoring
+skill adapter (#38), acceptance-corpus expansion (#39), Phase 3 closeout (#40).
 
 **ADR dependency note:** ADR-006 (staged mutation) is accepted — Phase 3
 consumes its `inspect/plan/apply` UX + hash-bound stale-plan rejection half.

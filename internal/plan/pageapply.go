@@ -18,9 +18,10 @@ const approvalVersion = 1
 
 // ApprovalFileName is the plan-scoped approval sidecar co-located with a staged
 // transaction under .llm-wiki/staging/<txn-id>/. Its presence means apply must
-// refuse until approval is explicitly granted (ADR-003 approval-required). The
-// trigger that writes it — a citation-loss-inducing edit — is later Phase 3 work
-// (#37); this issue provides only the generic read/refuse/grant plumbing.
+// refuse until approval is explicitly granted (ADR-003 approval-required). Plan
+// writes it (writeApprovalSidecar) when a staged edit drops an existing
+// evidence-context citation (ADR-008 sub-decision 6, #37); the read/refuse/grant
+// plumbing here is generic and indifferent to what raised the requirement.
 const ApprovalFileName = "approval.json"
 
 // ApprovalRecord is a plan's approval requirement, surfaced into the ADR-003

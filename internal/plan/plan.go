@@ -134,7 +134,12 @@ type Report struct {
 // page is Parsed unless it carries the never-suppressible okf-yaml-parse
 // finding; malformed YAML still hashes, since the bytes exist regardless of
 // parseability (ADR-006 base-hash capture).
-func Inspect(root, arg string, yaml yamladapter.Adapter, overrides map[string]contract.Severity) (*Report, error) {
+//
+// evidenceSections designates the ATX headings that open evidence contexts
+// (ADR-008 sub-decision 1); it is wired identically to runValidate and page plan
+// so all three agree on which links are citations (criterion 15). Empty means no
+// link is a citation — the pre-#37 behavior.
+func Inspect(root, arg string, yaml yamladapter.Adapter, evidenceSections []string, overrides map[string]contract.Severity) (*Report, error) {
 	ref, err := ResolvePage(root, arg)
 	if err != nil {
 		return nil, err
@@ -147,8 +152,10 @@ func Inspect(root, arg string, yaml yamladapter.Adapter, overrides map[string]co
 
 	// Anchor the ADR-008 repo-path resolution class identically to runValidate so
 	// inspect and validate agree on in-repo `../` links (criterion 15); ok=false
-	// falls back to the zero Options (pre-citation behavior).
+	// falls back to the zero Options (pre-citation behavior). The evidence sections
+	// come from the caller so inspect and validate see the same citations.
 	opts, _ := validate.AnchorRepo(root)
+	opts.EvidenceSections = evidenceSections
 	all := validate.NewWithOptions(yaml, opts).Run(os.DirFS(root))
 	all = validate.Resolve(all, overrides)
 

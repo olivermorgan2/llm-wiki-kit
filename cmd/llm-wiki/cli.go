@@ -50,7 +50,11 @@ Commands:
               (error/warning/suggestion). Takes an optional target directory
               (default: the current directory). Set LLM_WIKI_SEVERITY to a
               comma-separated list of code=severity pairs (e.g.
-              core-broken-link=error) to promote/demote a rule's severity.
+              core-broken-link=error) to promote/demote a rule's severity. Set
+              LLM_WIKI_EVIDENCE_SECTIONS to a comma-separated list of heading
+              titles (e.g. Evidence) to designate evidence contexts; links inside
+              them are classified as citations (core-citation-* findings) instead
+              of navigational links.
   page inspect
               Report a single page without mutating it. Reads the page at
               <path> (relative to --root, default the current directory, or an
@@ -68,7 +72,12 @@ Commands:
               diff. The change set is staged under .llm-wiki/staging/<txn-id>/
               for a later apply; nothing is committed. When the proposed content
               already matches the live page the plan is a no-op and stages
-              nothing. Takes <path> and --root like page inspect.
+              nothing. Takes <path> and --root like page inspect. When
+              LLM_WIKI_EVIDENCE_SECTIONS designates evidence contexts and the
+              edit drops an existing citation from them, the plan still succeeds
+              (exit 0) but emits a core-citation-loss finding and records an
+              approval requirement, so page apply refuses the removal (exit 3)
+              until re-run with --approve (ADR-008).
   page apply  Commit a staged page plan into the live tree (ADR-006). Takes the
               <txn-id> a prior page plan reported and --root (default the current
               directory). Before mutating, apply re-verifies the plan's recorded
@@ -175,6 +184,28 @@ func severityOverrides(config string) map[string]contract.Severity {
 		return nil
 	}
 	return overrides
+}
+
+// evidenceSections parses the LLM_WIKI_EVIDENCE_SECTIONS configuration into the
+// list of ATX heading titles that open a profile-designated evidence context
+// (ADR-008 sub-decision 1). The value is a comma-separated list of titles, each
+// trimmed of surrounding whitespace with empty entries dropped, e.g.
+// `LLM_WIKI_EVIDENCE_SECTIONS=Evidence,Sources`. An unset or empty variable
+// yields nil — the zero-cost default where no link is ever a citation, so the
+// engine behaves byte-identically to a run with citations disabled.
+//
+// This is the interim wiring channel for evidence-context designation, mirroring
+// the LLM_WIKI_SEVERITY precedent; profile-loaded evidence vocabulary is Phase 4
+// work that will supersede or augment it. It is engine configuration, not
+// profile-specific citation vocabulary.
+func evidenceSections() []string {
+	var out []string
+	for _, s := range strings.Split(os.Getenv("LLM_WIKI_EVIDENCE_SECTIONS"), ",") {
+		if s = strings.TrimSpace(s); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func runVersion(stdout io.Writer, jsonMode bool) int {
@@ -356,10 +387,12 @@ func runValidate(args []string, stdout io.Writer, jsonMode bool) int {
 
 	// Anchor the repo-path resolution class at the nearest .llm-wiki/ marker
 	// (ADR-008 sub-decision 3); ok=false falls back to the zero Options, which is
-	// byte-identical to the pre-citation engine. EvidenceSections stays unwired
-	// until profile loading lands (Phase 4). page inspect wires this identically
-	// so both agree on in-repo `../` links (criterion 15).
+	// byte-identical to the pre-citation engine. Evidence contexts come from
+	// LLM_WIKI_EVIDENCE_SECTIONS (the interim channel until profile loading lands
+	// in Phase 4); page inspect and page plan wire this identically so all three
+	// agree on which links are citations (criterion 15).
 	opts, _ := validate.AnchorRepo(root)
+	opts.EvidenceSections = evidenceSections()
 	findings := validate.NewWithOptions(yamladapter.New(), opts).Run(os.DirFS(root))
 	findings = validate.Resolve(findings, severityOverrides(os.Getenv("LLM_WIKI_SEVERITY")))
 	status := validate.StatusFor(findings)
@@ -441,7 +474,7 @@ func runPageInspect(args []string, stdout, stderr io.Writer, jsonMode bool) int 
 		return cmdInvalid("page inspect", stdout, stderr, jsonMode, "page inspect requires a <path> argument")
 	}
 
-	report, err := plan.Inspect(root, pagePath, yamladapter.New(), severityOverrides(os.Getenv("LLM_WIKI_SEVERITY")))
+	report, err := plan.Inspect(root, pagePath, yamladapter.New(), evidenceSections(), severityOverrides(os.Getenv("LLM_WIKI_SEVERITY")))
 	if err != nil {
 		switch {
 		case errors.Is(err, plan.ErrPageNotFound):
@@ -541,7 +574,12 @@ func runPagePlan(args []string, stdout, stderr io.Writer, jsonMode bool) int {
 		return cmdInvalid("page plan", stdout, stderr, jsonMode, fmt.Sprintf("cannot read proposed content: %v", err))
 	}
 
-	result, err := plan.Plan(root, pagePath, proposed, yamladapter.New())
+	// Wire the ADR-008 citation resolution the same way validate/inspect do so the
+	// gate never fires on citations validate cannot see (criterion 15): the
+	// repo-path anchor plus the interim evidence-section channel.
+	opts, _ := validate.AnchorRepo(root)
+	opts.EvidenceSections = evidenceSections()
+	result, err := plan.Plan(root, pagePath, proposed, yamladapter.New(), opts)
 	if err != nil {
 		switch {
 		case errors.Is(err, plan.ErrNotMarkdown):
@@ -571,6 +609,28 @@ func runPagePlan(args []string, stdout, stderr io.Writer, jsonMode bool) int {
 		Diff:        result.Diff,
 	}
 
+	// Citation-loss gate (ADR-008 sub-decision 6): Plan wrote the approval sidecar
+	// into the staging dir, so surface the loss as a warning finding (promotable
+	// via LLM_WIKI_SEVERITY, though the gate is the approval member, not severity)
+	// and set the approval requirement. The plan itself succeeded and is staged —
+	// the status stays success/exit 0; only apply refuses until --approve.
+	if result.LostCitations != nil {
+		reason := plan.CitationLossReason(result.LostCitations)
+		loss := validate.Resolve([]contract.Finding{{
+			Ruleset:  contract.RulesetProfile,
+			Severity: contract.SeverityWarning,
+			Code:     validate.CodeCitationLoss,
+			Message:  reason,
+			Path:     result.Path,
+		}}, severityOverrides(os.Getenv("LLM_WIKI_SEVERITY")))
+		env.Findings = append(env.Findings, loss...)
+		env.Approval = &contract.Approval{
+			Required: true,
+			Reason:   reason,
+			Paths:    []string{result.Path},
+		}
+	}
+
 	if jsonMode {
 		return emit(stdout, env)
 	}
@@ -586,6 +646,10 @@ func runPagePlan(args []string, stdout, stderr io.Writer, jsonMode bool) int {
 	fmt.Fprintf(stdout, "  txn:    %s\n", result.TxnID)
 	fmt.Fprintf(stdout, "  base:   %s\n", base)
 	fmt.Fprintf(stdout, "  staged: sha256 %s\n", result.StagedHash)
+	if result.LostCitations != nil {
+		fmt.Fprintf(stdout, "  approval required at apply: citation loss — %s (re-run apply with --approve)\n",
+			strings.Join(result.LostCitations, ", "))
+	}
 	fmt.Fprint(stdout, result.Diff)
 	return int(contract.ExitCodeForStatus(env.Status))
 }
