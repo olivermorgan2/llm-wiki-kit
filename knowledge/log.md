@@ -681,6 +681,52 @@ check). Full CI matrix (5 platforms: test + selfcheck + bundle) green on PR #61.
 Accepted under the 2026-07-03 autonomous-phase mandate, **flagged for Oliver's
 async ratification** alongside ADR-006/007/008/009.
 
+### 2026-07-04 — Phase 4 (Academic-research profile) implemented; phase closed out
+
+The `academic-research` profile shipped end-to-end (issues **#53–#59**, PRs
+**#61–#67**; closeout **#60** via this refresh): ADR-010 profile-data schema +
+citation vocabulary (#53/`7b6e20b`), data-backed loader with one-level
+`extends: core` (#54/`e6c3cf3`), type-conditional structural rules
+`profile-required-field|field-enum|list-min|required-section|recommended-pair`
+(#55/`d55a554`), citation obligations
+`profile-citation-required|target-type` landing ADR-008's two carry-ins
+(#56/`9497179`), the full addendum-003 profile + 5 valid / 9 invalid fixtures
+(#57/`8419c2b`), `init --profile academic-research` + data-generated per-type
+templates (#58/`f5cc82a`), and the named Phase 4 acceptance corpus
+(#59/`502c717`). `main` = `502c717`.
+
+**Gate verdict** (criterion **4 (academic-research)** + the addendum-003 fixture
+table): **green on all five platforms.** The three
+`TestAcceptanceCriterion4AcademicResearch…` journeys (author-each-type,
+negative-controls, evidence-obligation) pass in the named CI acceptance step on
+linux-amd64/arm64, macos-arm64/amd64, and windows-amd64 (PR #67 run
+28715363791). Local `go build`/`vet`/`test ./...` green (12 test packages + the
+embed-only `profiles/`). **Unlike Phase 3, the full CI matrix is green on all
+five platforms** — the #29 (windows perm bits, PR #52) and #30 (macos-amd64
+runner, PR #51) caveats were resolved before Phase 4.
+
+**Golden parity held throughout:** core `okf-*`/`core-*` rules stay engine-code
+and byte-identical (ADR-010 sub-decision 2); the data-driven profile layer fires
+only for profiled types; a core/zero profile runs no per-type rules; the core
+scaffold output is unchanged.
+
+**Codex second-opinion:** reviewed I1–I5 (ADR-010 `NEEDS_REVISION`→revised;
+loader `NEEDS_REVISION`→deep-copy Merge; structural rules
+`NEEDS_REVISION`→empty-string precedence; citations `READY`; fixtures
+`NEEDS_REVISION`→enum/list-min fixtures) — each addressed in-PR. I6/I7 (#58/#59)
+Codex reviews **deferred** (CLI usage limit, resets 2026-07-07); both carry
+strong end-to-end test evidence and are flagged on their PRs.
+
+**Milestone #4** (`Phase 4 — Academic-research profile`) closes **after** the #60
+closeout PR merges (0 open issues once #60 lands). ADR-010 accepted under the
+autonomous-phase mandate, **flagged for Oliver's async ratification** alongside
+ADR-006/007/008/009.
+
+**Next:** Phase 5 (Enrichment + index maintenance). The build-out plan's
+provisional **ADR-010 = index maintenance** was superseded — the number went to
+this schema ADR — so the index-maintenance ADR takes the next free number when
+Phase 5 lands.
+
 ### 2026-06-30 — Knowledge layer reconciled to canonical file set
 
 Aligned `knowledge/` with the project's explicit layer spec: added

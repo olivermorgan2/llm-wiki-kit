@@ -5,22 +5,28 @@ Front door to the `llm-wiki-kit` knowledge layer. Conventions live in
 
 ## Current phase
 
+**Phase 4 / Academic-research profile closed (issues #53–#59, PRs #61–#67 +
+closeout PR for #60; milestone #4 closes after that PR merges; ADR-010 accepted
+2026-07-04 under the autonomous-phase mandate — flagged for Oliver's async
+ratification).** The `academic-research` profile shipped end-to-end: the ADR-010
+profile-data schema + citation vocabulary (#53), the data-backed loader with
+one-level `extends: core` (#54), type-conditional structural rules (#55),
+citation obligations landing ADR-008's two carry-ins (#56), the full profile +
+per-type fixture corpus (#57), `init --profile academic-research` + per-type
+templates (#58), and the named Phase 4 acceptance corpus (#59); #60 is the
+closeout (evidence in [`../design/state.md`](../design/state.md)). The Phase 4
+exit gate (criterion **4 (academic-research)** + the addendum-003 fixtures) is
+**green on all five platforms** — the Phase-3 CI caveats are resolved
+(windows-amd64 full suite green after #52; macos-amd64 observed on
+`macos-15-intel` after #51). **Phase 5 / Enrichment + index maintenance** is
+next. Core rules stayed engine-code and byte-identical throughout (golden
+parity, ADR-010 sub-decision 2).
+
 **Phase 3 / Authoring + staged mutation closed (issues #32/#34–#42, PRs
-#33/#43–#49 + closeout PR for #40; milestone #3 closes after that PR merges;
-ADR-008 Codex-re-reviewed `READY` (5/5) and **accepted** 2026-07-03 under the
-autonomous-phase mandate — flagged for Oliver's async ratification).** The
-staged authoring surface shipped: `page inspect` (#42), `page plan` (#34),
-`page apply` with stale-plan rejection (#35), the ADR-008 citation mechanism
-(#36), the plan-time citation-loss approval gate (#37), the authoring skill
-adapter + `page inspect --content` (#38), and the named Phase 3 acceptance
-corpus (#39); #40 is the closeout (state + knowledge refresh, evidence in
-[`../design/state.md`](../design/state.md)). The Phase 3 exit gate (criteria
-6, 9, 10, 11, 12, 13) is **observed on 4/5** platforms (including Windows via
-the named acceptance step), macos-amd64 by inference — the two CI caveats
-carry forward: windows-amd64 full-suite RED (pre-existing `internal/`
-permission tests, **#29**) and macos-amd64 no CI evidence (runner unavailable,
-**#30**). **Phase 4 / Academic-research profile** is next. Issue #41 is a
-closed duplicate of #40.
+#33/#43–#49 + closeout #40; milestone #3 closed).** The staged authoring surface
+shipped: `page inspect`/`plan`/`apply`, the ADR-008 citation mechanism, the
+plan-time citation-loss approval gate, the authoring skill adapter, and the Phase
+3 acceptance corpus (criteria 6, 9–13). Issue #41 is a closed duplicate of #40.
 
 **Phase 1 / Foundation closed (issues #1–#6, PRs #7–#13, ADR-001–005 accepted).
 Phase 2 / Install-init closed (issues #14–#21, PRs #22–#28 + closeout PR #31;
