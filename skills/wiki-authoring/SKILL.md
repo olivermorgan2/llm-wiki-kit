@@ -30,7 +30,12 @@ The flow is: **draft → validate → plan (diff) → apply → confirm.**
 
 ### 1. Locate the bundle
 
-Find the bundle root — the directory containing `llm-wiki.yaml`. Read
+Find the bundle root — the directory containing `llm-wiki.yaml` — and `cd` into
+it before running any command below. Every command in this flow uses paths
+relative to the bundle root (`page inspect` / `page plan` default `--root` to
+`.`), so running from anywhere else silently targets the wrong tree. If you
+cannot `cd`, pass `--root <bundle-root>` explicitly on every `page inspect`,
+`page plan`, and `validate` invocation instead. Read
 `wiki/templates/page-template.md` there as your drafting base if it exists.
 
 ### 2. Draft outside the bundle
@@ -118,10 +123,11 @@ llm-wiki page apply <transaction> --json
 ### 6. Confirm
 
 ```
-llm-wiki validate <bundle-root> --json
+llm-wiki validate . --json
 ```
 
-Confirm the committed page validates clean. Report the committed path to the
+(`.` is the bundle root you `cd`'d into in step 1; pass the explicit path if you
+did not.) Confirm the committed page validates clean. Report the committed path to the
 human.
 
 ## Non-goals
