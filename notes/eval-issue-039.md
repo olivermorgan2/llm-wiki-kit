@@ -1,7 +1,7 @@
 # Evaluation — Issue #39: Phase 3 acceptance corpus (criteria 6, 9, 10, 11, 12, 13)
 
 **Branch:** `test/39-phase3-acceptance-corpus` (cut from synced `main`, `c3a8b9e`).
-**PR:** _to be filled after open._
+**PR:** [#49](https://github.com/olivermorgan2/llm-wiki-kit/pull/49)
 **ADRs:** [ADR-003](../design/adr/adr-003-json-contract-and-exit-codes.md)
 (envelope + exit codes), [ADR-004](../design/adr/adr-004-validation-severity-model.md)
 (severity model — the citation negative control is a warning),
