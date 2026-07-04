@@ -658,9 +658,28 @@ citation vocabulary ADR-008 sketched.
   index maintenance** (Phase 5); `adr-alloc` assigned the next free number to this
   schema decision, so the index-maintenance ADR renumbers when Phase 5 lands.
 
+**Codex second-opinion review (2026-07-04):** verdict `NEEDS_REVISION` →
+addressed → the ADR was revised in the same PR (#61). Substantive fixes taken:
+(1) added the optional profile-level **`severities`** override key that ADR-008
+sub-decision 5(d) mandates (wired through the existing `validate.Resolve` layer;
+academic-research ships it empty since defaults already match addendum 003) — this
+is the mechanism by which "a required citation must *resolve*" is expressed
+(promote `core-citation-unresolved`), closing the one real vocabulary gap;
+(2) corrected the carry-in-№1 wording (http(s) is class 1, matched **before** the
+`isIntraWiki` gate, not class-4 malformed); (3) sharpened that `extends: core`
+inherits **engine-owned semantics** (core rules run for every page), with the core
+YAML as merge-parent + docs only — one source of truth for core behavior;
+(4) specified field presence/type/enum/list-min **one-finding precedence** to
+protect fixture parity for I3; (5) explicitly scoped advisory-only items
+(source summary section, synthesis links, `publication_date` ISO-8601) **out** of
+the gated vocabulary; (6) clarified `forbiddenTargetTypes` is a **denylist**
+(`[question]`), not a source-only allowlist, matching addendum 003's principle
+that URLs/repo-paths are valid evidence. Rejected as a misread: none.
+
 check-plan (adr criteria) PASS (C1–C5; C6 is the deferred v1 semantic-conflict
-check). Accepted under the 2026-07-03 autonomous-phase mandate, **flagged for
-Oliver's async ratification** alongside ADR-006/007/008/009.
+check). Full CI matrix (5 platforms: test + selfcheck + bundle) green on PR #61.
+Accepted under the 2026-07-03 autonomous-phase mandate, **flagged for Oliver's
+async ratification** alongside ADR-006/007/008/009.
 
 ### 2026-06-30 — Knowledge layer reconciled to canonical file set
 

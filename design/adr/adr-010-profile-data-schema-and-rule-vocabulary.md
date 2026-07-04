@@ -139,20 +139,52 @@ types:                     # per-page-type rules, keyed on frontmatter `type`
     requiredSections: [Evidence gap]
   synthesis:
     requiredSections: [Scope, Findings, Agreement, Disagreement, "Evidence gaps"]
+
+severities:                # optional per-rule severity overrides (ADR-008 5(d))
+  # code: severity — restamps a finding's severity within the ADR-004 set.
+  # academic-research ships this EMPTY: the rule-kind defaults already match
+  # addendum 003. A profile that wanted "a required citation must resolve"
+  # would write `core-citation-unresolved: error` here.
 ```
 
 The vocabulary is **exactly** these keys — `required`, `recommended`, `enums`,
-`listMin`, `recommendedAnyOf`, `requiredSections`, `evidenceSections`, and
-`citation.{requireWhen, forbiddenTargetTypes}` — plus the `profile` header. There
-is **no expression syntax, no conditional-section syntax, and no cross-field
-logic** beyond `citation.requireWhen` (a single field-equals-value trigger). Any
-richer need supersedes addendum 003 with a new addendum and, if it needs a new
-rule *kind*, a new ADR — not free-form profile authoring. `requireWhen` is the
-one deliberate concession, and it is intentionally the weakest possible
-conditional (one field, one value) so it cannot grow into a predicate language.
-Per-type `required`/`recommended` list **only the fields the profile adds** on
-top of what the page inherits from core (which is why `title`/`description`/`type`
-never appear there — core already requires them for every page).
+`listMin`, `recommendedAnyOf`, `requiredSections`, `evidenceSections`,
+`citation.{requireWhen, forbiddenTargetTypes}`, and the profile-level
+`severities` map — plus the `profile` header. There is **no expression syntax, no
+conditional-section syntax, and no cross-field logic** beyond
+`citation.requireWhen` (a single field-equals-value trigger). Any richer need
+supersedes addendum 003 with a new addendum and, if it needs a new rule *kind*, a
+new ADR — not free-form profile authoring. `requireWhen` is the one deliberate
+concession, and it is intentionally the weakest possible conditional (one field,
+one value) so it cannot grow into a predicate language. Per-type
+`required`/`recommended` list **only the fields the profile adds** on top of what
+the page inherits from core (which is why `title`/`description`/`type` never
+appear there — core already requires them for every page).
+
+**`severities` (the ADR-008 5(d) override key) is data, not a new mechanism.** It
+supplies the **profile-override layer** of ADR-004's precedence (core defaults →
+**profile overrides** → baseline suppression), the same layer the interim
+`LLM_WIKI_SEVERITY` env channel feeds, routed through the existing
+`validate.Resolve(findings, overrides)` machinery — the profile just provides the
+override map. It **only restamps severity**; it never adds or removes findings.
+This is what lets a profile promote `core-citation-unresolved` (or
+`core-citation-malformed`) from warning to **error** to express "a required
+citation must *resolve*" — one finding at a promoted severity, per ADR-008
+sub-decision 5, **without** a new rule kind. `academic-research` ships an empty
+`severities` map because the rule-kind defaults already equal addendum 003's
+severities, so no fixture depends on it; the key exists so the vocabulary is
+**complete** against ADR-008's stated profile vocabulary, not merely against
+addendum 003's current defaults.
+
+**Deliberately out of the *gated* vocabulary (advisory only).** Addendum 003 also
+lists items it *recommends* but does **not** gate with a finding: a `source`
+summary section, `synthesis` links to the `claim`/`source` pages it synthesizes,
+and `publication_date` being ISO 8601. These carry **no** fixture and **no**
+severity row, so ADR-010 does **not** add `recommendedSections` or field-**format**
+rule kinds for them in the MVP — they stay advisory prose in the profile/templates.
+The closed vocabulary above is complete for everything addendum 003 **gates**;
+surfacing an advisory recommended-section or a date-format check would be a new
+rule kind behind a future addendum, not free-form authoring.
 
 ### 2. Core-rule boundary and the golden-parity constraint (binding on I2)
 
@@ -172,6 +204,20 @@ fully-declarative `core` migration, if ever wanted, is a **separate future issue
 guarded by golden tests**, explicitly out of Phase-4 scope. Rationale: the value
 of Phase 4 is the `academic-research` profile; a core rewrite would spend the
 Phase's risk budget on drift with no user-visible gain.
+
+**What `extends: core` inherits is engine-owned *semantics*, not YAML data.** A
+profiled page is validated by the union of (i) the engine's core rules, which run
+for **every** page regardless of profile exactly as today, and (ii) the resolved
+profile's per-type data rules. So `academic-research` "inherits core" because
+core's engine rules already apply to its pages — not because core's YAML is read
+and merged into behavior. The `profiles/core/profile.yaml` file's operational
+role is therefore narrow and explicit: it is the **merge parent** that makes the
+one-level `extends` resolution real and testable (I2), plus **documentation** of
+the core contract. Editing a *descriptive* value in that file does **not** change
+core validation in Phase 4 (the engine is authoritative); a future declarative-core
+migration is what would make that YAML behavior-bearing, and it is gated behind
+golden tests. This keeps the golden-parity invariant unambiguous: core behavior
+has exactly one source of truth — the engine — for the whole of Phase 4.
 
 ### 3. Profile rule kinds, the citation obligations, and both ADR-008 carry-ins
 
@@ -198,6 +244,32 @@ one problem into one finding per `{ruleset, code, path}` (ADR-004 FR8) and
 resolves severity inside ADR-004's precedence (core defaults → profile overrides
 → baseline suppression), inheriting the parse-failure gate.
 
+**Field presence, type, and one-finding precedence (fixes fixture-parity
+ambiguity; binding on I3).** So each problem yields exactly one finding and the
+fixtures trip exactly one rule, the rule kinds partition a field's states:
+
+- **Presence** is *key exists with a non-empty, non-null value* — the same test
+  as the shipped `hasNonEmptyString`/`missingRequiredString` (absent key, `null`,
+  `""`, or all-whitespace ⇒ absent). `profile-required-field` fires **only** on an
+  absent required field.
+- **`listMin`** governs a field that **is present**: if the value is not a list,
+  or is a list of fewer than N items, `profile-list-min` fires; an absent field is
+  the required-field rule's concern, not list-min's. So `authors:` omitted ⇒
+  `profile-required-field` only; `authors: []` or `authors: "x"` (present but not a
+  ≥1 list) ⇒ `profile-list-min` only. A field never trips both.
+- **`enums`** governs a field that **is present**: `profile-field-enum` fires when
+  the present value's scalar string is outside the set (a non-scalar value cannot
+  match the set and is likewise an enum violation, not a separate type finding).
+  An absent enum field trips `profile-required-field` only if it is also
+  `required`, else nothing.
+- **`recommendedAnyOf`/`recommended`** never gate: a `recommendedAnyOf` group with
+  no present member yields one `profile-recommended-pair` **suggestion**; absent
+  per-type `recommended` fields yield **no** profile finding (they are documentary;
+  core's own `core-recommended-missing` continues to cover core's recommended set).
+- **Evaluation order** is deterministic: types are keyed by the page's single
+  `type`; within a type the rule kinds run in the table's order and each aggregates
+  per ADR-004 FR8, so message ordering is stable across runs.
+
 **Carry-in №2 (present-but-unresolved satisfies the obligation) — decided.**
 `profile-citation-required` fires on the **absence of *any* inline-link citation**
 in the designated evidence section. **Resolvability is a separate axis:** a
@@ -215,11 +287,17 @@ about **presence**, not resolvability.
 **Carry-in №1 (`isIntraWiki` gate on class 3) — decided.** In
 `internal/validate/links.go` `classify`, the repo-path class (class 3) is entered
 **only** for targets that pass `isIntraWiki` (scheme-less, not protocol-relative
-`//…`, not a bare `#fragment`, not empty). A target failing `isIntraWiki` can
-never reach the repo-path `stat`: it is malformed by class 4. This makes the
-"never stat above the anchor / never follow a non-intra-wiki shape" boundary an
-explicit, test-guarded gate rather than an emergent property, and guarantees `//`
-and `#` targets never trigger a filesystem read.
+`//…`, not a bare `#fragment`, not empty). The classification order makes the gate
+explicit: **http(s) targets are matched first as class 1** (external, via
+`isHTTPScheme`) and never reach the `isIntraWiki` gate at all; of the *remaining*
+targets, one that **fails** `isIntraWiki` (a non-http(s) scheme, `//host`,
+`#frag`, or empty) is **class-4 malformed** and one that **passes** is a
+scheme-less intra-wiki reference that may enter class 2 (in-bundle) or, on a
+bundle-escaping `../`, class 3 (repo-path). So no `//`, `#`, `mailto:`-style, or
+empty target can ever reach the repo-path `stat`; only a scheme-less intra-wiki
+`../` escape does. This makes the "never stat above the anchor / never follow a
+non-intra-wiki shape" boundary an explicit, test-guarded gate rather than an
+emergent property.
 
 ### 4. Evidence-context scoping and forbidden-target-type resolution
 
@@ -235,6 +313,16 @@ page's frontmatter `type`**; only in-bundle, resolvable targets are type-checked
 (external/absent/malformed targets cannot be, and are governed by the
 `core-citation-*` codes). This is a read of already-walked page frontmatter — no
 new filesystem read beyond the ADR-008 repo-path `stat`.
+
+`forbiddenTargetTypes` is a **denylist, not a source-only allowlist.** Addendum
+003's provenance principle explicitly permits evidence to be a resolvable URL, a
+repo path, **or** an OKF `source` document, so a `claim` may cite a URL or another
+page as evidence; the one gated prohibition is that a `question` page — workflow
+state, never evidence — may not be an evidence target. Encoding this as a
+denylist (`[question]`) rather than an allowlist (`[source]`) is therefore the
+faithful reading: an allowlist would wrongly forbid the URL/repo-path citations
+the contract allows. In-bundle targets that are external URLs or repo paths have
+no page `type` to check and are simply not subject to this rule.
 
 ### 5. Unknown page types stay OKF/core-accepted
 
@@ -272,9 +360,11 @@ codes profile-agnostic; the divergence is recorded in `knowledge/log.md`.
   and forbidden-target-type checking needs the walked pages' frontmatter types
   available at evaluation time.
 - **Maintain:** the closed profile vocabulary and its per-type rule kinds; the
+  optional `severities` override map wired through `validate.Resolve`; the
   `profiles/core/profile.yaml` descriptive parent and the golden-parity invariant;
-  the `profile-*` code family and its severities; the per-type evidence-section
-  scoping; and the `isIntraWiki` class-3 gate.
+  the `profile-*` code family and its severities; the field-presence/one-finding
+  precedence; the per-type evidence-section scoping; and the `isIntraWiki`
+  class-3 gate.
 - **Deferred / out of scope:** a fully-declarative `core` migration (separate
   golden-guarded issue); conditional-section syntax and richer field sets (Q4,
   still assumption-locked to addendum 003); deep profile hierarchies (ADR-007,
