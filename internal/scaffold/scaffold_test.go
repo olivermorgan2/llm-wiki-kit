@@ -123,6 +123,83 @@ func TestScaffoldValidatesWithZeroFindings(t *testing.T) {
 	}
 }
 
+func academicProfile(t *testing.T) profile.Profile {
+	t.Helper()
+	p, err := profile.Resolve("academic-research")
+	if err != nil {
+		t.Fatalf("resolve academic-research profile: %v", err)
+	}
+	return p
+}
+
+// The academic-research scaffold carries the config, a home page, and one
+// authoring template per profiled type — sorted, slash-form, mode 0644.
+func TestAcademicPlanTargetsIncludePerTypeTemplates(t *testing.T) {
+	changes := Plan(academicProfile(t), fixedNow)
+	var got []string
+	for _, c := range changes {
+		got = append(got, c.Target)
+		if c.Mode != 0o644 {
+			t.Errorf("target %q mode = %o, want 0644", c.Target, c.Mode)
+		}
+	}
+	want := []string{
+		"llm-wiki.yaml",
+		"wiki/index.md",
+		"wiki/templates/claim.md",
+		"wiki/templates/method.md",
+		"wiki/templates/question.md",
+		"wiki/templates/source.md",
+		"wiki/templates/synthesis.md",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("targets = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("target[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+// The config records the academic-research profile reference (id + version).
+func TestAcademicPlanConfigRecordsProfileReference(t *testing.T) {
+	changes := Plan(academicProfile(t), fixedNow)
+	var config []byte
+	for _, c := range changes {
+		if c.Target == "llm-wiki.yaml" {
+			config = c.Data
+		}
+	}
+	var cfg struct {
+		Profile struct {
+			ID      string `yaml:"id"`
+			Version string `yaml:"version"`
+		} `yaml:"profile"`
+	}
+	if err := yamladapter.New().Unmarshal(config, &cfg); err != nil {
+		t.Fatalf("config does not unmarshal: %v", err)
+	}
+	if cfg.Profile.ID != "academic-research" || cfg.Profile.Version != "1.0" {
+		t.Errorf("profile ref = %q/%q, want academic-research/1.0", cfg.Profile.ID, cfg.Profile.Version)
+	}
+}
+
+// AC1 for academic-research: the scaffolded bundle validates with ZERO findings
+// UNDER the academic-research profile — the per-type templates are valid
+// instances (no missing required field/section, no enum/list-min violation, no
+// citation obligation, no broken template link).
+func TestAcademicScaffoldValidatesWithZeroFindings(t *testing.T) {
+	p := academicProfile(t)
+	dir := t.TempDir()
+	writePlan(t, dir, Plan(p, fixedNow))
+
+	findings := validate.NewWithOptions(yamladapter.New(), validate.Options{Profile: p}).Run(os.DirFS(dir))
+	if len(findings) != 0 {
+		t.Fatalf("academic scaffold must validate clean under its profile, got %d:\n%+v", len(findings), findings)
+	}
+}
+
 func TestConflictsEmptyDirIsNil(t *testing.T) {
 	dir := t.TempDir()
 	got, err := Conflicts(dir, Plan(coreProfile(t), fixedNow))
