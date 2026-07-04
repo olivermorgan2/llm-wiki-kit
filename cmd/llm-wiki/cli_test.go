@@ -229,6 +229,51 @@ func TestInitExplicitCoreProfileSucceeds(t *testing.T) {
 	}
 }
 
+// init --profile academic-research scaffolds the profile's per-type templates,
+// records the profile reference in llm-wiki.yaml, and the result validates clean
+// UNDER the academic-research profile (validate reads the active profile from the
+// config). This is the I6 acceptance path end-to-end through the CLI.
+func TestInitAcademicResearchScaffoldsAndValidatesClean(t *testing.T) {
+	dir := t.TempDir()
+
+	stdout, _, code := exec(t, "init", dir, "--profile", "academic-research", "--json")
+	if code != int(contract.ExitSuccess) {
+		t.Fatalf("init --profile academic-research exit = %d, want 0", code)
+	}
+	env := decodeEnvelope(t, stdout)
+	// The per-type templates are materialized.
+	for _, rel := range []string{
+		"wiki/templates/source.md", "wiki/templates/claim.md", "wiki/templates/method.md",
+		"wiki/templates/question.md", "wiki/templates/synthesis.md",
+	} {
+		if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(rel))); err != nil {
+			t.Errorf("template %q missing: %v", rel, err)
+		}
+	}
+	if len(env.AffectedPaths) != 7 {
+		t.Errorf("affectedPaths = %v, want 7 (config + index + 5 templates)", env.AffectedPaths)
+	}
+
+	// The config records the academic-research reference.
+	cfg, err := os.ReadFile(filepath.Join(dir, "llm-wiki.yaml"))
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	if !strings.Contains(string(cfg), "id: academic-research") {
+		t.Errorf("config does not record academic-research profile:\n%s", cfg)
+	}
+
+	// validate resolves the active profile from the config and runs clean.
+	vout, _, vcode := exec(t, "validate", dir, "--json")
+	venv := decodeEnvelope(t, vout)
+	if venv.Status != contract.StatusSuccess || len(venv.Findings) != 0 {
+		t.Errorf("academic scaffold must validate clean, status=%q findings=%+v", venv.Status, venv.Findings)
+	}
+	if vcode != int(contract.ExitSuccess) {
+		t.Errorf("validate exit = %d, want 0", vcode)
+	}
+}
+
 func TestInitUnknownProfileIsInvalidInvocation(t *testing.T) {
 	dir := t.TempDir()
 	stdout, _, code := exec(t, "init", dir, "--profile", "bogus", "--json")

@@ -35,8 +35,12 @@ it before running any command below. Every command in this flow uses paths
 relative to the bundle root (`page inspect` / `page plan` default `--root` to
 `.`), so running from anywhere else silently targets the wrong tree. If you
 cannot `cd`, pass `--root <bundle-root>` explicitly on every `page inspect`,
-`page plan`, and `validate` invocation instead. Read
-`wiki/templates/page-template.md` there as your drafting base if it exists.
+`page plan`, and `validate` invocation instead. Use a template under
+`wiki/templates/` as your drafting base if one exists: a `core` bundle ships
+`page-template.md`, while a domain bundle (e.g. `academic-research`) ships one
+per page type — `wiki/templates/<type>.md` (`source`, `claim`, `method`,
+`question`, `synthesis`). Pick the template whose `type` matches the page you are
+authoring; the engine enforces that type's rules on the result.
 
 ### 2. Draft outside the bundle
 
@@ -47,9 +51,11 @@ frontmatter (`type`, `title`, `description`, `timestamp`, `tags`, `aliases`,
 
 Put every sourced claim under an **evidence context** — an `## Evidence` heading —
 and cite it with an inline link to a resolvable target (an `https://…` URL or an
-existing in-bundle page). Designate the evidence heading with the environment
-variable `LLM_WIKI_EVIDENCE_SECTIONS` (interim channel until profile vocabulary
-lands), e.g. `LLM_WIKI_EVIDENCE_SECTIONS=Evidence`.
+existing in-bundle page). The active profile designates a page type's evidence
+sections (a domain profile like `academic-research` marks `## Evidence` on a
+`claim`); the engine reads that from the bundle's `llm-wiki.yaml` automatically.
+`LLM_WIKI_EVIDENCE_SECTIONS=Evidence` remains available as an explicit override
+when authoring against a bundle whose profile designates none.
 
 Worked example (`wiki/photosynthesis.md`):
 
@@ -132,6 +138,8 @@ human.
 
 ## Non-goals
 
-This skill authors a single core-profile page. It does not enrich existing pages,
-run hooks, apply academic-research profile rules, or package/install anything —
-those are out of scope.
+This skill authors a single page and embeds **no** profile-specific policy: it
+delegates every rule to the engine, which applies whatever profile the bundle's
+`llm-wiki.yaml` declares (`core`, `academic-research`, …) and reports the findings
+the skill surfaces verbatim. It does not enrich existing pages, run hooks, define
+or extend profile rules, or package/install anything — those are out of scope.
