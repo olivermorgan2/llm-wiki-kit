@@ -40,7 +40,10 @@ func academicEngine(t *testing.T) *Engine {
 var acInvalidFixtureCodes = map[string]string{
 	"source-missing-authors.md":         codeProfileRequiredField,
 	"source-no-doi-or-url.md":           codeProfileRecommendedPair,
+	"source-bad-source-type.md":         codeProfileFieldEnum,
+	"source-empty-authors.md":           codeProfileListMin,
 	"claim-supported-no-citation.md":    codeProfileCitationRequired,
+	"claim-bad-confidence.md":           codeProfileFieldEnum,
 	"method-missing-limitations.md":     codeProfileRequiredSection,
 	"claim-cites-question.md":           codeProfileCitationTargetType,
 	"synthesis-missing-disagreement.md": codeProfileRequiredSection,
