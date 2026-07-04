@@ -53,6 +53,16 @@ const (
 	codeProfileListMin         = "profile-list-min"         // error
 	codeProfileRequiredSection = "profile-required-section" // error
 	codeProfileRecommendedPair = "profile-recommended-pair" // suggestion
+
+	// Profile citation-obligation codes (ADR-008 sub-decision 5; ADR-010
+	// sub-decision 3). profile-citation-required fires on the absence of any
+	// citation in a type's evidence section when the citation.requireWhen trigger
+	// holds; a present-but-unresolved citation satisfies it (carry-in №2) and only
+	// raises the separate core-citation-unresolved. profile-citation-target-type
+	// fires when a citation resolves to a page whose type is forbidden (carry-in
+	// on a `question` never being evidence). Both are ruleset:profile, error.
+	codeProfileCitationRequired   = "profile-citation-required"    // error
+	codeProfileCitationTargetType = "profile-citation-target-type" // error
 )
 
 // evaluatePage runs the OKF and core-profile rules over one page and returns

@@ -115,7 +115,12 @@ func (r *resolver) classify(target string) resolution {
 	}
 
 	// Bundle-escaping `../`: the repo-path class (sub-decision 3's `../`
-	// refinement). No anchor → malformed (bundle-root fallback).
+	// refinement). Reaching here means the target already passed the isIntraWiki
+	// gate above (ADR-010 carry-in №1): http(s) was matched as class 1 before the
+	// gate, and every non-intra-wiki shape (`//host`, `#frag`, a non-http scheme,
+	// empty) returned malformed at the gate — so no such target ever reaches the
+	// repo-path `stat`. TestClassifyIsIntraWikiGatesRepoStat regression-guards this.
+	// No anchor → malformed (bundle-root fallback).
 	if r.repoResolve == nil {
 		return resolution{class: classMalformed, resolved: false, key: "malformed:" + target}
 	}
