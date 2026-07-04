@@ -42,7 +42,12 @@ jobs:
           - name: macos-arm64
             runner: macos-14
           - name: macos-amd64
-            runner: macos-13
+            # macos-13 was retired 2025-12-08 (its label maps to no runner, so
+            # the leg queued forever). macos-15-intel is GitHub's last hosted
+            # Intel macOS image, supported through Aug 2027; after that, amd64
+            # macOS evidence needs a new decision (Rosetta-on-arm64 or a
+            # documented ADR-002 gate revision). See #30.
+            runner: macos-15-intel
           - name: linux-amd64
             runner: ubuntu-24.04
           - name: linux-arm64
@@ -150,7 +155,10 @@ jobs:
             key: darwin_arm64
             exe: llm-wiki
           - name: macos-amd64
-            runner: macos-13
+            # See the test matrix above: macos-13 retired 2025-12-08,
+            # macos-15-intel is the last hosted Intel macOS image (through Aug
+            # 2027). See #30.
+            runner: macos-15-intel
             key: darwin_amd64
             exe: llm-wiki
           - name: linux-amd64
