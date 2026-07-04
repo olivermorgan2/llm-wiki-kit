@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/olivermorgan2/llm-wiki-kit/internal/fsafe"
+	"github.com/olivermorgan2/llm-wiki-kit/internal/validate"
 	"github.com/olivermorgan2/llm-wiki-kit/internal/yamladapter"
 )
 
@@ -68,7 +69,7 @@ func TestPlanNewPageAbsentBaseFullFileDiff(t *testing.T) {
 	root := t.TempDir()
 	proposed := "---\ntitle: New Page\ntype: concept\ncustom_field: keep\n---\n\n# New Page\n\nBody line.\n"
 
-	res, err := Plan(root, "wiki/new.md", []byte(proposed), yamladapter.New())
+	res, err := Plan(root, "wiki/new.md", []byte(proposed), yamladapter.New(), validate.Options{})
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -135,7 +136,7 @@ func TestPlanExistingPagePreservesUnknownFields(t *testing.T) {
 
 	// A whole-page edit that changes the title but re-includes the unknown fields.
 	proposed := "---\ntitle: New\ntype: concept\ncustom_field: keep-me\nx-tool-meta: 42\n---\n\n# Old\n\nBody.\n"
-	res, err := Plan(root, "wiki/p.md", []byte(proposed), yamladapter.New())
+	res, err := Plan(root, "wiki/p.md", []byte(proposed), yamladapter.New(), validate.Options{})
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -190,7 +191,7 @@ func TestPlanIdenticalInputIsNoOp(t *testing.T) {
 		t.Fatalf("staging dir count = %d before plan, want 0", n)
 	}
 
-	res, err := Plan(root, "wiki/same.md", []byte(existing), yamladapter.New())
+	res, err := Plan(root, "wiki/same.md", []byte(existing), yamladapter.New(), validate.Options{})
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -211,7 +212,7 @@ func TestPlanIdenticalInputIsNoOp(t *testing.T) {
 // A boundary-escaping target is refused with the fsafe sentinel, unwrapped.
 func TestPlanBoundaryEscape(t *testing.T) {
 	root := t.TempDir()
-	_, err := Plan(root, filepath.Join("..", "evil.md"), []byte("x"), yamladapter.New())
+	_, err := Plan(root, filepath.Join("..", "evil.md"), []byte("x"), yamladapter.New(), validate.Options{})
 	if !errors.Is(err, fsafe.ErrOutsideBoundary) {
 		t.Errorf("err = %v, want fsafe.ErrOutsideBoundary", err)
 	}
@@ -220,7 +221,7 @@ func TestPlanBoundaryEscape(t *testing.T) {
 // A non-markdown target is rejected before any filesystem work.
 func TestPlanNotMarkdown(t *testing.T) {
 	root := t.TempDir()
-	_, err := Plan(root, "notes.txt", []byte("x"), yamladapter.New())
+	_, err := Plan(root, "notes.txt", []byte("x"), yamladapter.New(), validate.Options{})
 	if !errors.Is(err, ErrNotMarkdown) {
 		t.Errorf("err = %v, want ErrNotMarkdown", err)
 	}
@@ -232,7 +233,7 @@ func TestPlanNonRegularTarget(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "wiki", "dir.md"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	_, err := Plan(root, "wiki/dir.md", []byte("x"), yamladapter.New())
+	_, err := Plan(root, "wiki/dir.md", []byte("x"), yamladapter.New(), validate.Options{})
 	if !errors.Is(err, ErrTargetNotRegular) {
 		t.Errorf("err = %v, want ErrTargetNotRegular", err)
 	}
@@ -243,7 +244,7 @@ func TestPlanNonRegularTarget(t *testing.T) {
 func TestPlanVerbatimWhenFrontmatterUnparseable(t *testing.T) {
 	root := t.TempDir()
 	proposed := "---\ntitle: {broken\n---\n\n# Body\n"
-	res, err := Plan(root, "wiki/bad.md", []byte(proposed), yamladapter.New())
+	res, err := Plan(root, "wiki/bad.md", []byte(proposed), yamladapter.New(), validate.Options{})
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}

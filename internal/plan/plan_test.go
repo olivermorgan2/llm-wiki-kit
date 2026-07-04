@@ -155,7 +155,7 @@ func TestInspectValidPage(t *testing.T) {
 	root := t.TempDir()
 	abs := writePage(t, root, "wiki/index.md", validPage)
 
-	rep, err := Inspect(root, "wiki/index.md", yamladapter.New(), nil)
+	rep, err := Inspect(root, "wiki/index.md", yamladapter.New(), nil, nil)
 	if err != nil {
 		t.Fatalf("Inspect: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestInspectWarningsOnly(t *testing.T) {
 	// filename is a warning. Use both to land on success-with-warnings.
 	writePage(t, root, "wiki/Index_Page.md", missingRecommendedPage)
 
-	rep, err := Inspect(root, "wiki/Index_Page.md", yamladapter.New(), nil)
+	rep, err := Inspect(root, "wiki/Index_Page.md", yamladapter.New(), nil, nil)
 	if err != nil {
 		t.Fatalf("Inspect: %v", err)
 	}
@@ -211,7 +211,7 @@ func TestInspectMalformedYAML(t *testing.T) {
 			root := t.TempDir()
 			abs := writePage(t, root, "wiki/bad.md", body)
 
-			rep, err := Inspect(root, "wiki/bad.md", yamladapter.New(), nil)
+			rep, err := Inspect(root, "wiki/bad.md", yamladapter.New(), nil, nil)
 			if err != nil {
 				t.Fatalf("Inspect: %v", err)
 			}
@@ -257,7 +257,7 @@ func TestInspectBrokenLinkNeedsBundleContext(t *testing.T) {
 		writePage(t, root, "wiki/other.md", validPage)
 		writePage(t, root, "wiki/linker.md", linkPage("wiki/other.md"))
 
-		rep, err := Inspect(root, "wiki/linker.md", yamladapter.New(), nil)
+		rep, err := Inspect(root, "wiki/linker.md", yamladapter.New(), nil, nil)
 		if err != nil {
 			t.Fatalf("Inspect: %v", err)
 		}
@@ -272,7 +272,7 @@ func TestInspectBrokenLinkNeedsBundleContext(t *testing.T) {
 		root := t.TempDir()
 		writePage(t, root, "wiki/linker.md", linkPage("wiki/ghost.md"))
 
-		rep, err := Inspect(root, "wiki/linker.md", yamladapter.New(), nil)
+		rep, err := Inspect(root, "wiki/linker.md", yamladapter.New(), nil, nil)
 		if err != nil {
 			t.Fatalf("Inspect: %v", err)
 		}
@@ -298,7 +298,7 @@ func TestInspectOverridesChangeSeverity(t *testing.T) {
 	writePage(t, root, "wiki/linker.md", linker)
 
 	// Default: broken-link is a warning → success-with-warnings.
-	base, err := Inspect(root, "wiki/linker.md", yamladapter.New(), nil)
+	base, err := Inspect(root, "wiki/linker.md", yamladapter.New(), nil, nil)
 	if err != nil {
 		t.Fatalf("Inspect: %v", err)
 	}
@@ -307,7 +307,7 @@ func TestInspectOverridesChangeSeverity(t *testing.T) {
 	}
 
 	// Promote broken-link to error → validation-failure.
-	promoted, err := Inspect(root, "wiki/linker.md", yamladapter.New(),
+	promoted, err := Inspect(root, "wiki/linker.md", yamladapter.New(), nil,
 		map[string]contract.Severity{"core-broken-link": contract.SeverityError})
 	if err != nil {
 		t.Fatalf("Inspect(override): %v", err)
