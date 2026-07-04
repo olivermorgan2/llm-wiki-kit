@@ -1,0 +1,25 @@
+# academic-research profile — the initial domain value proposition (PRD §11,
+# addendum 003), one inheritance level over core (ADR-007).
+#
+# MINIMAL at this stage (issue #54 / I2): this file ships only the profile header
+# so the data-backed loader can resolve `academic-research` and prove the
+# `extends: core` merge. The full addendum-003 contract — the five added/tightened
+# page types (source, claim, method, question, synthesis), their required fields,
+# enums, list-min, required sections, recommended pairs, and citation obligations,
+# per the ADR-010 schema — is filled in by issue #57 (I5) alongside the per-type
+# valid/invalid fixture corpus. The type-conditional rule engine (#55/I3) and the
+# citation obligations (#56/I4) are tested against synthetic profiles until then.
+profile:
+  id: academic-research
+  version: "1.0"
+  extends: core
+
+# Filled in by #57 (I5): per-type required/recommended/enums/listMin/
+# recommendedAnyOf/requiredSections/evidenceSections/citation for
+# source | claim | method | question | synthesis.
+types: {}
+
+# academic-research uses the rule-kind default severities (they already match
+# addendum 003's severity table), so no overrides are needed. The key exists so
+# the vocabulary is complete against ADR-008 sub-decision 5(d).
+severities: {}
