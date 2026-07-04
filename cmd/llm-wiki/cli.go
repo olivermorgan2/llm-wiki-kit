@@ -63,7 +63,11 @@ Commands:
               Findings are identical to those validate reports for the same
               page; LLM_WIKI_SEVERITY overrides apply as with validate. The
               path must resolve to a regular .md file inside the bundle
-              boundary; a path escaping the boundary is refused (exit 5).
+              boundary; a path escaping the boundary is refused (exit 5). Pass
+              --content <file> (or "-" for stdin) to inspect proposed content
+              instead of the live page — the draft is validated in full bundle
+              context without being staged, and its target may not yet exist (a
+              new-page draft), which is the authoring flow's validate step.
   page plan   Preview a whole-page change without mutating the live tree
               (ADR-006). Reads the proposed page content from --content <file>
               (or stdin when the flag is omitted or set to "-"), normalizes its
@@ -435,14 +439,20 @@ func runPage(args []string, stdout, stderr io.Writer, jsonMode bool) int {
 
 // runPageInspect reports a single page read-only. It parses its own flags in the
 // hand-rolled selfcheckRoot/runInit style (the global loop only strips --json):
-// --root/--root=<dir> (default "."), exactly one positional <path>. It maps the
-// plan substrate's outcomes to the contract: a boundary escape is a system
-// failure (exit 5, per fsafe's documented "every guard error → system-failure"
-// rule), while a missing page, a non-.md path, or a bad invocation is
-// invalid-invocation (exit 4). On success it emits the standard envelope plus
-// the optional page payload carrying path/parse-status/content-hash.
+// --root/--root=<dir> (default "."), an optional --content/--content=<file> for
+// inspecting proposed content (default: the live page; "-" reads stdin), and
+// exactly one positional <path>. It maps the plan substrate's outcomes to the
+// contract: a boundary escape is a system failure (exit 5, per fsafe's documented
+// "every guard error → system-failure" rule), while a missing page, a non-.md
+// path, or a bad invocation is invalid-invocation (exit 4). With --content the
+// target may be absent (a new-page draft is validated in full bundle context
+// without being staged); without it the live page must exist as before. On
+// success it emits the standard envelope plus the optional page payload carrying
+// path/parse-status/content-hash.
 func runPageInspect(args []string, stdout, stderr io.Writer, jsonMode bool) int {
 	root := "."
+	content := ""
+	haveContent := false
 	var pagePath string
 	havePath := false
 
@@ -459,6 +469,16 @@ func runPageInspect(args []string, stdout, stderr io.Writer, jsonMode bool) int 
 			root = strings.TrimPrefix(a, "--root=")
 		case strings.HasPrefix(a, "-root="):
 			root = strings.TrimPrefix(a, "-root=")
+		case a == "--content" || a == "-content":
+			if i+1 >= len(args) {
+				return cmdInvalid("page inspect", stdout, stderr, jsonMode, "--content requires a value")
+			}
+			i++
+			content, haveContent = args[i], true
+		case strings.HasPrefix(a, "--content="):
+			content, haveContent = strings.TrimPrefix(a, "--content="), true
+		case strings.HasPrefix(a, "-content="):
+			content, haveContent = strings.TrimPrefix(a, "-content="), true
 		case strings.HasPrefix(a, "-"):
 			return cmdInvalid("page inspect", stdout, stderr, jsonMode, fmt.Sprintf("unknown flag %q", a))
 		default:
@@ -474,13 +494,18 @@ func runPageInspect(args []string, stdout, stderr io.Writer, jsonMode bool) int 
 		return cmdInvalid("page inspect", stdout, stderr, jsonMode, "page inspect requires a <path> argument")
 	}
 
-	report, err := plan.Inspect(root, pagePath, yamladapter.New(), evidenceSections(), severityOverrides(os.Getenv("LLM_WIKI_SEVERITY")))
+	// With --content the report comes from the proposed bytes over an overlay of
+	// the live bundle (the authoring flow's validate step); without it, the live
+	// page on disk is inspected as before.
+	report, err := inspectReport(root, pagePath, content, haveContent)
 	if err != nil {
 		switch {
 		case errors.Is(err, plan.ErrPageNotFound):
 			return cmdInvalid("page inspect", stdout, stderr, jsonMode, fmt.Sprintf("no page at %q", pagePath))
 		case errors.Is(err, plan.ErrNotMarkdown):
 			return cmdInvalid("page inspect", stdout, stderr, jsonMode, fmt.Sprintf("%q is not a markdown page", pagePath))
+		case errors.Is(err, errContentRead):
+			return cmdInvalid("page inspect", stdout, stderr, jsonMode, err.Error())
 		case errors.Is(err, fsafe.ErrOutsideBoundary), errors.Is(err, fsafe.ErrSymlinkEscape):
 			// Boundary escape maps to system-failure per fsafe's documented rule.
 			return cmdSystemFailure("page inspect", stdout, stderr, jsonMode, err)
@@ -513,6 +538,26 @@ func runPageInspect(args []string, stdout, stderr io.Writer, jsonMode bool) int 
 	}
 	return int(contract.ExitCodeForStatus(env.Status))
 }
+
+// inspectReport produces the page-inspect report for the live page or, when
+// --content was given, for the proposed bytes. The evidence-section channel and
+// severity overrides are wired identically for both paths so a draft is judged by
+// the same rules as its committed form.
+func inspectReport(root, pagePath, content string, haveContent bool) (*plan.Report, error) {
+	overrides := severityOverrides(os.Getenv("LLM_WIKI_SEVERITY"))
+	if !haveContent {
+		return plan.Inspect(root, pagePath, yamladapter.New(), evidenceSections(), overrides)
+	}
+	proposed, err := readProposedContent(content, haveContent)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", errContentRead, err)
+	}
+	return plan.InspectContent(root, pagePath, proposed, yamladapter.New(), evidenceSections(), overrides)
+}
+
+// errContentRead marks a failure to read the --content source (a bad file path or
+// stdin error): a well-formed but unsatisfiable invocation, mapped to exit 4.
+var errContentRead = errors.New("cannot read proposed content")
 
 // runPagePlan previews a whole-page change without mutating the live tree
 // (ADR-006). It parses its own flags in the hand-rolled runPageInspect style:
