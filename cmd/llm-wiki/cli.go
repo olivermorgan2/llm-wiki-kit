@@ -69,6 +69,15 @@ Commands:
               for a later apply; nothing is committed. When the proposed content
               already matches the live page the plan is a no-op and stages
               nothing. Takes <path> and --root like page inspect.
+  page apply  Commit a staged page plan into the live tree (ADR-006). Takes the
+              <txn-id> a prior page plan reported and --root (default the current
+              directory). Before mutating, apply re-verifies the plan's recorded
+              base hashes against the live tree; if a source/target changed since
+              the plan was made it is rejected with zero mutation (exit 4). A
+              clean apply commits exactly the previewed files through the
+              transaction layer and cleans staging. If the plan carries an
+              approval requirement, apply refuses (exit 3) until re-run with
+              --approve.
   selfcheck   Verify this platform's shipped binary against its bundled
               checksum (ADR-002). Use --root <dir> to point at the bundle;
               defaults to the directory containing the running executable.
@@ -370,7 +379,7 @@ func runValidate(args []string, stdout io.Writer, jsonMode bool) int {
 // page subcommand follows.
 func runPage(args []string, stdout, stderr io.Writer, jsonMode bool) int {
 	if len(args) == 0 {
-		return cmdInvalid("page", stdout, stderr, jsonMode, "page requires a subcommand (inspect, plan)")
+		return cmdInvalid("page", stdout, stderr, jsonMode, "page requires a subcommand (inspect, plan, apply)")
 	}
 	sub, subArgs := args[0], args[1:]
 	switch sub {
@@ -378,6 +387,8 @@ func runPage(args []string, stdout, stderr io.Writer, jsonMode bool) int {
 		return runPageInspect(subArgs, stdout, stderr, jsonMode)
 	case "plan":
 		return runPagePlan(subArgs, stdout, stderr, jsonMode)
+	case "apply":
+		return runPageApply(subArgs, stdout, stderr, jsonMode)
 	default:
 		return cmdInvalid("page", stdout, stderr, jsonMode, fmt.Sprintf("unknown page subcommand %q", sub))
 	}
@@ -581,6 +592,117 @@ func readProposedContent(content string, haveContent bool) ([]byte, error) {
 		return io.ReadAll(os.Stdin)
 	}
 	return os.ReadFile(content)
+}
+
+// runPageApply commits a staged page plan into the live tree (ADR-006). It parses
+// its own flags in the hand-rolled runPagePlan style: --root/--root=<dir>
+// (default "."), --approve to grant a recorded approval requirement, and exactly
+// one positional <txn-id> (the id a prior page plan reported). It delegates to
+// plan.Apply, which re-verifies the recorded base hashes against the live tree
+// before mutating, and maps the outcomes to the contract:
+//   - a clean apply commits exactly the previewed change set → success with the
+//     apply payload and affectedPaths;
+//   - an un-granted approval requirement → approval-required (exit 3), the
+//     approval envelope field, and zero mutation;
+//   - a stale plan, a missing transaction, or a target that turned non-regular →
+//     invalid-invocation (exit 4) with zero mutation — the invocation was
+//     well-formed but the plan can no longer be applied (criterion 13);
+//   - a boundary escape or other txn/fsafe error → system-failure (exit 5).
+func runPageApply(args []string, stdout, stderr io.Writer, jsonMode bool) int {
+	root := "."
+	approved := false
+	var txnID string
+	haveTxn := false
+
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--root" || a == "-root":
+			if i+1 >= len(args) {
+				return cmdInvalid("page apply", stdout, stderr, jsonMode, "--root requires a value")
+			}
+			i++
+			root = args[i]
+		case strings.HasPrefix(a, "--root="):
+			root = strings.TrimPrefix(a, "--root=")
+		case strings.HasPrefix(a, "-root="):
+			root = strings.TrimPrefix(a, "-root=")
+		case a == "--approve" || a == "-approve":
+			approved = true
+		case strings.HasPrefix(a, "-"):
+			return cmdInvalid("page apply", stdout, stderr, jsonMode, fmt.Sprintf("unknown flag %q", a))
+		default:
+			if haveTxn {
+				return cmdInvalid("page apply", stdout, stderr, jsonMode, fmt.Sprintf("unexpected argument %q", a))
+			}
+			txnID, haveTxn = a, true
+		}
+	}
+
+	if !haveTxn {
+		return cmdInvalid("page apply", stdout, stderr, jsonMode, "page apply requires a <txn-id> argument")
+	}
+
+	res, err := plan.Apply(root, txnID, approved)
+	if err != nil {
+		switch {
+		case errors.Is(err, txn.ErrTxnNotFound):
+			return cmdReject("page apply", stdout, stderr, jsonMode, fmt.Sprintf("no staged plan %q (never planned, or already applied)", txnID))
+		case errors.Is(err, txn.ErrStale):
+			return cmdReject("page apply", stdout, stderr, jsonMode, fmt.Sprintf("plan %q is stale — a target changed since it was planned; re-plan and re-apply", txnID))
+		case errors.Is(err, txn.ErrNonRegularTarget):
+			return cmdReject("page apply", stdout, stderr, jsonMode, fmt.Sprintf("plan %q target is no longer a regular file; re-plan", txnID))
+		case errors.Is(err, fsafe.ErrOutsideBoundary), errors.Is(err, fsafe.ErrSymlinkEscape):
+			// Boundary escape maps to system-failure per fsafe's documented rule.
+			return cmdSystemFailure("page apply", stdout, stderr, jsonMode, err)
+		default:
+			return cmdSystemFailure("page apply", stdout, stderr, jsonMode, err)
+		}
+	}
+
+	if res.ApprovalRequired != nil {
+		env := contract.New("page apply", contract.StatusApprovalRequired)
+		env.Approval = &contract.Approval{
+			Required: true,
+			Reason:   res.ApprovalRequired.Reason,
+			Paths:    res.ApprovalRequired.Paths,
+		}
+		if jsonMode {
+			return emit(stdout, env)
+		}
+		fmt.Fprintf(stderr, "llm-wiki: page apply refused — %s\n", res.ApprovalRequired.Reason)
+		fmt.Fprintf(stderr, "  re-run with --approve to proceed\n")
+		for _, p := range res.ApprovalRequired.Paths {
+			fmt.Fprintf(stderr, "  %s\n", p)
+		}
+		return int(contract.ExitCodeForStatus(env.Status))
+	}
+
+	env := contract.New("page apply", contract.StatusSuccess)
+	env.AffectedPaths = res.AppliedPaths
+	env.Apply = &contract.PageApply{Transaction: res.TxnID, Committed: res.AppliedPaths}
+	if jsonMode {
+		return emit(stdout, env)
+	}
+	fmt.Fprintf(stdout, "page apply: applied %d file(s) — txn %s\n", len(res.AppliedPaths), res.TxnID)
+	for _, p := range res.AppliedPaths {
+		fmt.Fprintf(stdout, "  %s\n", p)
+	}
+	return int(contract.ExitCodeForStatus(env.Status))
+}
+
+// cmdReject emits an invalid-invocation outcome (exit 4) for a well-formed
+// invocation the engine cannot carry out — a stale plan or a missing staging
+// transaction. Unlike cmdInvalid it prints a concise reason without the full
+// usage text, since the command line itself was valid; only the referenced plan
+// is no longer applicable.
+func cmdReject(op string, stdout, stderr io.Writer, jsonMode bool, msg string) int {
+	if jsonMode {
+		env := contract.New(op, contract.StatusInvalidInvocation)
+		return emit(stdout, env)
+	}
+	fmt.Fprintf(stderr, "llm-wiki: %s: %s\n", op, msg)
+	return int(contract.ExitInvalidInvocation)
 }
 
 // runSelfcheck detects the running platform and verifies its shipped binary
