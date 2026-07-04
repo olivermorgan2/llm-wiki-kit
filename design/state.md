@@ -180,9 +180,12 @@ Full accounting in [`../notes/eval-issue-039.md`](../notes/eval-issue-039.md).
 - **Windows permission-mode tests** — full suite red on windows-amd64
   (`internal/fsafe` + `internal/txn`); pre-existing, predates Phase 3, not a
   regression. Follow-up issue **#29** (still open, unfixed by Phase 3).
-- **macos-amd64 runner gap** — `macos-13` leg never dispatched; no amd64-macOS
-  CI evidence. Phase 3 closed with this leg unobserved, as Phase 2 did.
-  Follow-up issue **#30** (still open).
+- **macos-amd64 runner gap** — `macos-13` leg never dispatched (GitHub retired
+  the macos-13 runner image 2025-12-08, so the label mapped to no runner); Phase
+  3 closed with this leg unobserved, as Phase 2 did. **Resolved** by moving the
+  leg to `macos-15-intel` (GitHub's last hosted Intel macOS image, supported
+  through Aug 2027) — issue **#30**/PR #51. Residual: the Aug 2027 sunset of
+  hosted x86_64 macOS (tracked in `knowledge/risks.md`).
 - **ADR-008 Codex carry-ins → Phase 4** — gate resolution class 3 on
   `isIntraWiki`; whether a present-but-unresolved citation satisfies a
   require-citation obligation. Both are profile-vocabulary work, deferred to the
