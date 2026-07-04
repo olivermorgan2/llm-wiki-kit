@@ -5,20 +5,27 @@ Front door to the `llm-wiki-kit` knowledge layer. Conventions live in
 
 ## Current phase
 
+**Phase 3 / Authoring + staged mutation closed (issues #32/#34–#42, PRs
+#33/#43–#49 + closeout PR for #40; milestone #3 closes after that PR merges;
+ADR-008 Codex-re-reviewed `READY` (5/5) and **accepted** 2026-07-03 under the
+autonomous-phase mandate — flagged for Oliver's async ratification).** The
+staged authoring surface shipped: `page inspect` (#42), `page plan` (#34),
+`page apply` with stale-plan rejection (#35), the ADR-008 citation mechanism
+(#36), the plan-time citation-loss approval gate (#37), the authoring skill
+adapter + `page inspect --content` (#38), and the named Phase 3 acceptance
+corpus (#39); #40 is the closeout (state + knowledge refresh, evidence in
+[`../design/state.md`](../design/state.md)). The Phase 3 exit gate (criteria
+6, 9, 10, 11, 12, 13) is **observed on 4/5** platforms (including Windows via
+the named acceptance step), macos-amd64 by inference — the two CI caveats
+carry forward: windows-amd64 full-suite RED (pre-existing `internal/`
+permission tests, **#29**) and macos-amd64 no CI evidence (runner unavailable,
+**#30**). **Phase 4 / Academic-research profile** is next. Issue #41 is a
+closed duplicate of #40.
+
 **Phase 1 / Foundation closed (issues #1–#6, PRs #7–#13, ADR-001–005 accepted).
 Phase 2 / Install-init closed (issues #14–#21, PRs #22–#28 + closeout PR #31;
-milestone #2 closed 2026-07-03;
-ADR-006/007/009 Codex-re-reviewed `READY` (5/5) and **accepted** 2026-07-03
-under the autonomous-phase mandate — flagged for Oliver's async ratification).**
-The install/init surface shipped: ADR-006 cross-file transaction layer (#16),
-`init` core profile (#18), `install` lifecycle + version-record manifest (#19),
-five-platform CI matrix (#15), install/init acceptance corpus (#20), and
-multi-platform release bundle + selfcheck smoke (#17); #21 is the closeout
-(state + knowledge refresh, evidence in [`../design/state.md`](../design/state.md)).
-Two CI caveats deferred with follow-ups: windows-amd64 full-suite RED
-(pre-existing `internal/` permission tests, **#29**) and macos-amd64 no CI
-evidence (runner unavailable, **#30**) — Phase 2 gate observed on **4/5**
-platforms, not 5/5. **Phase 3 / Authoring + staged mutation** is next.
+milestone #2 closed 2026-07-03; ADR-006/007/009 accepted 2026-07-03 under the
+autonomous-phase mandate — flagged for Oliver's async ratification).**
 Bootstrapped 2026-06-30 from `claude-workflow-kit` v5.0.1.
 Source PRD normalized; adversarial Codex review (`NEEDS_REVISION`) landed as PRD
 addenda 001–005; `/prd-to-mvp` produced [`design/mvp.md`](../design/mvp.md) and
@@ -58,36 +65,31 @@ questions **Q2/Q7/Q8 closed** with ADR + log back-references. See
 
 ## Next action
 
-**Phase 2 / Install-init closed out 2026-07-03 (issues #14–#21, PRs #22–#28 +
-closeout PR #31).** The evidence artifact is [`../design/state.md`](../design/state.md)
-(merged issue/PR table, five-category validation evidence, exit-criteria
-verdict). Two caveats deferred with follow-ups: windows-amd64 full-suite RED
-(follow-up **#29**) and macos-amd64 no CI evidence (follow-up **#30**); the
-Phase 2 gate is **observed on 4/5** platforms, closed on inference for
-macos-amd64. The closeout PR **#31** merged (`main` = `30cfbac`), closing issue
-#21 and dropping milestone #2 (`Phase 2 — Install/init`) to zero open issues;
-Hermes then closed the milestone manually (9 closed / 0 open, 2026-07-03).
-
-**ADR-008 (provenance & citation model) is now drafted + accepted (2026-07-03,
-issue #32, branch `docs/adr-008-provenance-citation-model`, Codex `READY` 5/5
-under the autonomous-phase mandate, flagged for Oliver's async ratification).
-Phase 3 authoring is unblocked** — see [`log.md`](log.md) and
-[`reviews/2026-07-03-codex-adr-008-review.md`](reviews/2026-07-03-codex-adr-008-review.md)
-/ [`-rereview.md`](reviews/2026-07-03-codex-adr-008-rereview.md).
+**Phase 3 / Authoring + staged mutation closed out 2026-07-04 (issues
+#32/#34–#42, PRs #33/#43–#49 + closeout PR for #40).** The evidence artifact is
+[`../design/state.md`](../design/state.md) (merged issue/PR ledger, five-category
+validation evidence, exit-criteria verdict for criteria 6/9/10/11/12/13). Two
+caveats carry forward: windows-amd64 full-suite RED (follow-up **#29**) and
+macos-amd64 no CI evidence (follow-up **#30**); the Phase 3 gate is **observed
+on 4/5** platforms (Windows via the named acceptance step), closed on inference
+for macos-amd64. Once the #40 closeout PR merges, milestone #3 drops to zero
+open issues and is closed manually with the #29/#30 caveat notes (**not** closed
+before merge — #40 would otherwise sit open inside a closed milestone). Issue
+#41 is a closed duplicate of #40.
 
 Next moves, in order:
 
-1. **File Phase 3 issues** — `page inspect`/`plan`/`apply` (ADR-006 UX half +
-   hash-bound stale-plan rejection), the authoring skill adapter (draft →
-   validate → diff), and the provenance/citation acceptance fixtures (criterion 9)
-   that consume ADR-008's core mechanism. Carry forward ADR-008's two Codex
-   non-blocking notes (gate the repo-path class on `isIntraWiki`; define whether a
-   present-but-unresolved citation satisfies a require-citation obligation) and
-   the profile-vocabulary keys deferred to Phase 4.
-2. **Oliver async-ratifies ADR-006/007/009 (and now 008)** — all accepted under
-   the 2026-07-03 mandate, still flagged (not a blocker).
-3. **Draft remaining Phase 3+ ADR candidates** (010/011/012) from the "Decisions
-   needing ADRs" list as their phases come up.
+1. **File Phase 4 issues** — the academic-research profile per
+   [`design/build-out-plan.md`](../design/build-out-plan.md) §Phase 4 (ADR-007
+   profile-system boundary, already accepted). Carry forward ADR-008's two Codex
+   non-blocking carry-ins as Phase 4 profile-vocabulary work: gate the repo-path
+   resolution class on `isIntraWiki`, and define whether a present-but-unresolved
+   citation satisfies a require-citation obligation. Enrichment (Phase 5) and
+   cross-surface parity (Phase 6) remain later.
+2. **Oliver async-ratifies ADR-006/007/008/009** — all accepted under the
+   2026-07-03 mandate, still flagged (not a blocker).
+3. **Draft remaining ADR candidates** (010/011/012) from the "Decisions needing
+   ADRs" list as their phases come up.
 
 Phase 1 issues (all `Foundation`, repo `olivermorgan2/llm-wiki-kit`), closed via
 merged PRs #7–#13:
