@@ -571,6 +571,52 @@ latter now with its mechanism decided. Validation: `check-plan` ADR-C1–C5 PASS
 clean. Next: **file Phase 3 issues** (`page inspect`/`plan`/`apply` + authoring
 adapter).
 
+### 2026-07-04 — Phase 3 (Authoring + staged mutation) closed out
+
+The full Phase 3 train merged and the closeout issue **#40** (this entry)
+refreshes [`../design/state.md`](../design/state.md) and the knowledge layer and
+records the gate evidence. **Docs-only — no product behavior changed.**
+[`../design/state.md`](../design/state.md) is the authoritative evidence
+artifact; this entry is the log pointer.
+
+**Merged train** (ADR-008 accepted #32/PR #33 `1d6ca79`; then, over PRs
+#43–#49): `page inspect` + subcommand dispatch (#42/`02fa777`), `page plan`
+hash-bound staged preview (#34/`84a08e7`), `page apply` journaled commit +
+stale-plan rejection (#35/`04c358b`), the ADR-008 citation mechanism — evidence
+contexts, offline three-class resolver, `core-citation-*` findings
+(#36/`7a5f17a`), the plan-time citation-loss approval gate (#37/`68abc1a`), the
+authoring skill adapter + `page inspect --content` overlay validation
+(#38/`c3a8b9e`), and the named Phase 3 acceptance corpus (#39/`05b1b9a`).
+`main` = `05b1b9a`.
+
+**Gate verdict** (exit criteria **6, 9, 10, 11, 12, 13**, per
+[`../notes/eval-issue-039.md`](../notes/eval-issue-039.md)): the six
+`TestAcceptanceCriterion...` tests pass; local `go build`/`vet`/`test ./...`
+green on the Unix dev host (12 packages) and `TestAcceptance` **12/12** (6
+Phase 3 + 6 Phase 2). Named CI acceptance step green on **4 of 5** platforms
+(linux-amd64, linux-arm64, macos-arm64 full jobs; **windows-amd64 acceptance
+step `success`** — the job then failed only at the full `go test`);
+macos-amd64 cancelled. Verdict recorded as **observed 4/5, macos-amd64 by
+inference** — not 5/5; the docs-only gate call is Hermes's.
+
+**Two caveats carried forward — deferred, not fixed here:** windows-amd64 full
+`go test ./...` RED on pre-existing Unix permission-mode assertions in
+`internal/fsafe` + `internal/txn` (follow-up **#29**, not a Phase 3 regression);
+macos-amd64 (`macos-13`) produced no CI evidence — runner never dispatched
+(follow-up **#30**). ADR-008's two Codex non-blocking carry-ins (gate class 3 on
+`isIntraWiki`; present-but-unresolved vs require-citation obligation) move to
+Phase 4 profile-vocabulary work. Issue **#41** is a closed duplicate of #40
+(recorded only).
+
+**Milestone #3** (`Phase 3 — Authoring + staged mutation`) closes **after** the
+#40 closeout PR merges (0 open issues once #40 lands), with honest #29/#30 caveat
+notes — **not** closed before merge. Oliver's async ratification of
+ADR-006/007/008/009 remains a standing flag, not a blocker.
+
+**Next:** file Phase 4 (academic-research profile) issues per
+[`../design/build-out-plan.md`](../design/build-out-plan.md) §Phase 4; ADR-007
+already accepted.
+
 ### 2026-06-30 — Knowledge layer reconciled to canonical file set
 
 Aligned `knowledge/` with the project's explicit layer spec: added
