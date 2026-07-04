@@ -133,6 +133,14 @@ at closeout time — the same "merged over a pending matrix" situation as the
 Phase 2 closeout (PR #31). Recorded honestly; the docs-only gate call is
 Hermes's.
 
+The **closeout PR #50 run 28700768953** (PR #50 head `67114b9`) reproduces the
+same posture on the PR that carries this closeout: linux-amd64, linux-arm64, and
+macos-arm64 **pass**; windows-amd64's named acceptance step **PASSES** and the
+full suite fails **only** on the known `internal/fsafe`/`internal/txn` POSIX
+mode-bit assertions (#29); macos-amd64 test + selfcheck are **queued/unobserved**
+(#30); `build bundle + checksums` and the observed per-platform selfcheck smokes
+**pass**. Same caveats as above, now named on the closeout PR itself.
+
 **4. Known pre-existing failure (not a Phase 3 regression):** windows-amd64
 full `go test ./...` is red **only** in `internal/fsafe` and `internal/txn`, on
 Unix file-permission-mode assertions (`mode = -rw-rw-rw-, want -rw-r-----`).
