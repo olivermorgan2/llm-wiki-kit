@@ -1,21 +1,24 @@
 # Project State
 
-_Last updated: 2026-07-03_
+_Last updated: 2026-07-04_
 
 ## Current status
 
-- **Phase 2 / Install-init: complete; milestone #2 closed.** The closeout PR
-  #31 merged (`main` = `30cfbac`), closing issue #21 and dropping milestone #2
-  (`Phase 2 — Install/init`) to zero open issues; Hermes then closed the
-  milestone manually (state=closed, 9 closed / 0 open, closed 2026-07-03).
-  Oliver's async ratification of ADR-006/007/009 **and now ADR-008** remains the
-  one outstanding flag — not a merge blocker.
-- **Phase 3 prerequisite done: ADR-008 (provenance & citation model) accepted**
-  2026-07-03 (issue #32, Codex `READY` 5/5, same mandate/flag). Phase 3
-  authoring is unblocked.
-- **Next phase: Phase 3 / Authoring + staged mutation** — file the Phase 3
-  issues (`page inspect`/`plan`/`apply`, authoring adapter, provenance/citation
-  fixtures).
+- **Phase 3 / Authoring + staged mutation: in progress.** The `page`
+  command group is building out issue-by-issue on the ADR-006 transaction
+  substrate. Landed so far: ADR-008 (provenance & citation model) accepted
+  (#32); `page inspect` read-only report (#42, PR #43); `page plan` staged
+  whole-page preview (#34, PR #44). `main` = `84a08e7`.
+- **Current issue: #35 — `page apply`: journaled commit with stale-plan
+  rejection.** Applies a staged `page plan` transaction: re-verifies recorded
+  base hashes against the live tree, rejects a stale plan with zero mutation,
+  commits exactly the previewed files through the ADR-006 txn layer, and adds
+  generic ADR-003 approval-refusal plumbing (the citation-loss trigger itself
+  is the later #37). Phase 3 stays **open**.
+- **Phase 2 / Install-init: complete; milestone #2 closed** (closeout PR #31,
+  milestone closed manually 2026-07-03). Oliver's async ratification of
+  ADR-006/007/009 and ADR-008 remains the one outstanding flag — not a merge
+  blocker.
 
 ## Phase 2 / Install-init — complete
 
@@ -156,11 +159,16 @@ stated for Hermes/Oliver to weigh.
 
 Full accounting in [`../notes/eval-issue-020.md`](../notes/eval-issue-020.md).
 
-## Next phase — Phase 3 / Authoring + staged mutation
+## Current phase — Phase 3 / Authoring + staged mutation (in progress)
 
 Goal: the thinnest end-to-end "create real value" path — author a new page
 through the staged, preview-before-write workflow (`page inspect` / `page plan`
 / `page apply` with hash-bound, stale-rejecting plans; authoring skill adapter).
+
+Progress: `page inspect` (#42) and `page plan` (#34) merged; `page apply`
+(#35) is the current issue. Remaining Phase 3 work after #35: citation-loss
+approval trigger (#37), authoring skill adapter (#38), acceptance-corpus
+expansion (#39).
 
 **ADR dependency note:** ADR-006 (staged mutation) is accepted — Phase 3
 consumes its `inspect/plan/apply` UX + hash-bound stale-plan rejection half.
