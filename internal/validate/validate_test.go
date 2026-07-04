@@ -100,6 +100,29 @@ func TestRunAllLinksValidNoBrokenLinkFinding(t *testing.T) {
 	}
 }
 
+// NewWithOptions surfaces citation findings end-to-end when EvidenceSections is
+// set, and a page whose frontmatter fails to split yields only okf-yaml-parse —
+// the citation rules inherit the parse-failure gate.
+func TestRunWithOptionsEmitsCitationFindings(t *testing.T) {
+	opts := Options{EvidenceSections: []string{"Evidence"}}
+	fsys := fstest.MapFS{
+		"good.md": page(validPage + "\n## Evidence\nSee [x](claims/missing.md).\n"),
+		"bad.md":  page("---\ntype: concept\ntitle: {broken\n## Evidence\n[x](gone.md)\n"),
+	}
+	got := NewWithOptions(yamladapter.New(), opts).Run(fsys)
+
+	unres := findingsWithCode(got, codeCoreCitationUnresolved)
+	if len(unres) != 1 || unres[0].Path != "good.md" {
+		t.Fatalf("want one core-citation-unresolved on good.md, got %+v", got)
+	}
+	// bad.md fails to parse: only okf-yaml-parse, no citation finding.
+	for _, f := range got {
+		if f.Path == "bad.md" && f.Code != CodeYAMLParse {
+			t.Errorf("parse-failed page must yield only okf-yaml-parse, got %+v", f)
+		}
+	}
+}
+
 // End-to-end through the precedence layers: a malformed page exits validation-
 // failure; the parse error survives baseline in release-gate mode.
 func TestRunThroughPrecedenceMalformedIsValidationFailure(t *testing.T) {

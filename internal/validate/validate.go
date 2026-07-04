@@ -22,11 +22,37 @@ import (
 // imports goccy directly.
 type Engine struct {
 	yaml yamladapter.Adapter
+	opts Options
 }
 
-// New returns a validation Engine that decodes YAML through the given adapter.
+// Options configures ADR-008 citation resolution. The zero value reproduces the
+// pre-citation engine exactly: no link is ever a citation (empty
+// EvidenceSections), and the repo-path class is empty (nil RepoResolve), so only
+// the navigational broken-link rule runs.
+type Options struct {
+	// EvidenceSections lists the ATX heading titles that open a profile-designated
+	// evidence context. Empty means no link is ever classified as a citation.
+	EvidenceSections []string
+	// BundleDir is the bundle root relative to the repo root in slash form
+	// ("" when equal); used to map bundle-escaping `../` targets into the repo.
+	BundleDir string
+	// RepoResolve is the read-only repo-path existence check (ADR-008
+	// sub-decision 3). nil means no `.llm-wiki/` anchor: the repo-path class is
+	// empty and every bundle-escaping target is malformed.
+	RepoResolve func(string) RepoStatus
+}
+
+// New returns a validation Engine that decodes YAML through the given adapter,
+// with citation resolution disabled (the zero Options).
 func New(yaml yamladapter.Adapter) *Engine {
 	return &Engine{yaml: yaml}
+}
+
+// NewWithOptions returns a validation Engine wired with ADR-008 citation
+// resolution options. Callers build opts via AnchorRepo (repo-path anchor) and,
+// in Phase 4, profile-loaded EvidenceSections.
+func NewWithOptions(yaml yamladapter.Adapter, opts Options) *Engine {
+	return &Engine{yaml: yaml, opts: opts}
 }
 
 // Run walks fsys for markdown pages and returns every finding at its core-default
@@ -64,13 +90,18 @@ func (e *Engine) Run(fsys fs.FS) []contract.Finding {
 		return nil
 	})
 
-	exists := func(target string) bool { return files[target] }
+	res := &resolver{
+		exists:      func(target string) bool { return files[target] },
+		bundleDir:   e.opts.BundleDir,
+		repoResolve: e.opts.RepoResolve,
+	}
 	for _, pg := range pages {
 		out = append(out, evaluatePage(e.yaml, pg.path, pg.content)...)
-		// Link resolution needs the page body; a page whose frontmatter fails to
-		// split already yields okf-yaml-parse and has no link findings.
+		// Link and citation resolution need the page body; a page whose
+		// frontmatter fails to split already yields okf-yaml-parse and has no
+		// link/citation findings (the parse-failure gate is inherited).
 		if _, body, err := splitFrontmatter(pg.content); err == nil {
-			out = append(out, linkRules(pg.path, body, exists)...)
+			out = append(out, linkRules(pg.path, body, res, e.opts.EvidenceSections)...)
 		}
 	}
 	return out

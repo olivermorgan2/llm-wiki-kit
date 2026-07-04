@@ -145,7 +145,11 @@ func Inspect(root, arg string, yaml yamladapter.Adapter, overrides map[string]co
 		return nil, fmt.Errorf("plan: read page: %w", err)
 	}
 
-	all := validate.New(yaml).Run(os.DirFS(root))
+	// Anchor the ADR-008 repo-path resolution class identically to runValidate so
+	// inspect and validate agree on in-repo `../` links (criterion 15); ok=false
+	// falls back to the zero Options (pre-citation behavior).
+	opts, _ := validate.AnchorRepo(root)
+	all := validate.NewWithOptions(yaml, opts).Run(os.DirFS(root))
 	all = validate.Resolve(all, overrides)
 
 	findings := []contract.Finding{}

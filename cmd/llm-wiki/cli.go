@@ -354,7 +354,13 @@ func runValidate(args []string, stdout io.Writer, jsonMode bool) int {
 		root = args[0]
 	}
 
-	findings := validate.New(yamladapter.New()).Run(os.DirFS(root))
+	// Anchor the repo-path resolution class at the nearest .llm-wiki/ marker
+	// (ADR-008 sub-decision 3); ok=false falls back to the zero Options, which is
+	// byte-identical to the pre-citation engine. EvidenceSections stays unwired
+	// until profile loading lands (Phase 4). page inspect wires this identically
+	// so both agree on in-repo `../` links (criterion 15).
+	opts, _ := validate.AnchorRepo(root)
+	findings := validate.NewWithOptions(yamladapter.New(), opts).Run(os.DirFS(root))
 	findings = validate.Resolve(findings, severityOverrides(os.Getenv("LLM_WIKI_SEVERITY")))
 	status := validate.StatusFor(findings)
 
