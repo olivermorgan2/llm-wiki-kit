@@ -12,16 +12,22 @@ _Last updated: 2026-07-04_
   stale-plan rejection + generic ADR-003 approval-refusal plumbing (#35,
   PR #45); citation mechanism — evidence contexts, offline three-class
   resolver, `core-citation-{malformed,unresolved,duplicate}` findings (#36,
-  PR #46). `main` = `7a5f17a`.
-- **Current issue: #37 — citation-loss approval gate for page plans.**
-  Implements ADR-008 sub-decision 6: `page plan` computes the citation-loss
-  diff (normalized evidence-context citation-target sets, source vs staged),
-  emits a `core-citation-loss` finding, and writes the ADR-003 approval
-  sidecar so `page apply` refuses the unapproved removal with exit 3 until
-  `--approve`. Builds on #36's resolver and #44/#45's generic approval
-  plumbing (the trigger that writes the sidecar). Out of scope: authoring
-  adapter (#38), acceptance fixtures (#39), Phase 3 closeout (#40), Phase 4
-  profile vocabulary, new envelope fields, and all network I/O. Phase 3 stays
+  PR #46); citation-loss approval gate for page plans (#37, PR #47) —
+  `page plan` emits `core-citation-loss` and writes the approval sidecar so an
+  unapproved `page apply` refuses with exit 3. `main` = `68abc1a`.
+- **Current issue: #38 — authoring skill adapter: draft → validate → plan
+  diff → apply.** Ships the first *shipped* Claude Code skill asset,
+  `skills/wiki-authoring/SKILL.md` (thin adapter prose over the engine CLI, no
+  independent logic per MVP principle 3). The one engine addition is
+  `page inspect --content <file|->`: validates proposed draft bytes in full
+  bundle context over an overlay FS without staging, allowing an absent target
+  (new-page draft), so the flow can validate before it plans (criteria 9–12).
+  Settled pre-implementation: shipped skills live at repo-root
+  `skills/<name>/SKILL.md` (plugin-package source root, sibling to `bin/`);
+  contract in `docs/contract/authoring-skill.md`. Out of scope: acceptance
+  corpus (#39), Phase 3 closeout (#40), Phase 4 profile vocabulary, enrichment
+  skill, hooks, plugin manifest/marketplace/naming, release-bundle packaging of
+  `skills/`, new envelope fields, and exit-code changes. Phase 3 stays
   **open**.
 - **Phase 2 / Install-init: complete; milestone #2 closed** (closeout PR #31,
   milestone closed manually 2026-07-03). Oliver's async ratification of

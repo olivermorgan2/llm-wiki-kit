@@ -180,6 +180,94 @@ func Inspect(root, arg string, yaml yamladapter.Adapter, evidenceSections []stri
 	}, nil
 }
 
+// InspectContent reports the page-scoped validation findings for proposed
+// content at arg without that content being on disk — the validate step of the
+// authoring flow (draft → validate → plan diff → apply, issue #38). It mirrors
+// Inspect exactly, with two differences: the target may be absent (a new-page
+// draft is allowed; a non-.md path or a boundary escape is still rejected as in
+// ResolvePage), and the shared validate engine runs over an overlay of
+// os.DirFS(root) that serves the proposed bytes at the target and injects the
+// draft into the bundle file set. Running the one engine over the whole bundle
+// keeps content-inspect, live inspect, and validate reporting identical findings
+// for the same content (criterion 15) — broken-link and citation membership see
+// the draft as part of the bundle.
+//
+// ContentHash is the SHA-256 of the proposed bytes exactly as read
+// (pre-normalization; frontmatter canonicalization stays page plan's job). A
+// draft whose frontmatter fails to parse is still hashed and reported unparsed,
+// exactly as Inspect treats a malformed live page. evidenceSections and overrides
+// are wired identically to Inspect.
+func InspectContent(root, arg string, proposed []byte, yaml yamladapter.Adapter, evidenceSections []string, overrides map[string]contract.Severity) (*Report, error) {
+	ref, err := resolveContentTarget(root, arg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Anchor the ADR-008 repo-path resolution class identically to Inspect/runValidate
+	// so all surfaces agree on in-repo `../` links (criterion 15); the evidence
+	// sections come from the caller so they see the same citations.
+	opts, _ := validate.AnchorRepo(root)
+	opts.EvidenceSections = evidenceSections
+	fsys := newOverlayFS(root, ref.Rel, proposed)
+	all := validate.NewWithOptions(yaml, opts).Run(fsys)
+	all = validate.Resolve(all, overrides)
+
+	findings := []contract.Finding{}
+	parsed := true
+	for _, f := range all {
+		if f.Path != ref.Rel {
+			continue
+		}
+		if f.Code == validate.CodeYAMLParse {
+			parsed = false
+		}
+		findings = append(findings, f)
+	}
+
+	return &Report{
+		Path:        ref.Rel,
+		Parsed:      parsed,
+		ContentHash: hashBytes(proposed),
+		Findings:    findings,
+		Status:      validate.StatusFor(findings),
+	}, nil
+}
+
+// resolveContentTarget resolves arg to a bundle-relative page address for
+// content-inspect: it enforces the ADR-005 boundary gate and the .md check
+// exactly as ResolvePage does, but permits an absent target (a new-page draft).
+// An existing non-regular target (a directory or other special file) is rejected
+// as ErrPageNotFound — nothing regular lives there to inspect. The .md check runs
+// before touching the filesystem, matching ResolvePage's ordering.
+func resolveContentTarget(root, arg string) (PageRef, error) {
+	gate, err := fsafe.New(root)
+	if err != nil {
+		return PageRef{}, fmt.Errorf("plan: open boundary: %w", err)
+	}
+	if filepath.Ext(arg) != ".md" {
+		return PageRef{}, ErrNotMarkdown
+	}
+	abs, err := gate.Resolve(arg)
+	if err != nil {
+		// fsafe sentinels pass through unwrapped for the caller's errors.Is.
+		return PageRef{}, err
+	}
+	info, err := os.Lstat(abs)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		// A new-page draft: the target does not exist yet, which is allowed here.
+	case err != nil:
+		return PageRef{}, fmt.Errorf("plan: stat page: %w", err)
+	case !info.Mode().IsRegular():
+		return PageRef{}, ErrPageNotFound
+	}
+	rel, err := relForRoot(root, abs)
+	if err != nil {
+		return PageRef{}, err
+	}
+	return PageRef{Root: root, Rel: rel, Abs: abs}, nil
+}
+
 // hashBytes returns the lowercase hex SHA-256 of b. This is the single hashing
 // contract shared across llm-wiki (staged postimages, base records, manifest
 // entries); the per-package duplication is deliberate repo precedent so each
