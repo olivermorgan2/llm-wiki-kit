@@ -150,10 +150,9 @@ func TestLoadMalformedIsError(t *testing.T) {
 	}
 }
 
-// Merge is additive/tightening: the child's rules union over the parent's, the
-// child keeps its identity, list fields union order-stably, maps take the child
-// on conflict, and the child's citation block replaces the parent's for a shared
-// type. Merge must not mutate its inputs.
+// Merge is additive: the child's rules union over the parent's, the child keeps
+// its identity, list fields union order-stably, key-conflicting map entries and
+// the citation block take the child, and the result deep-copies both inputs.
 func TestMergeIsAdditiveAndNonMutating(t *testing.T) {
 	base := Profile{
 		ID: "core", Version: "0.1.0",
@@ -167,7 +166,7 @@ func TestMergeIsAdditiveAndNonMutating(t *testing.T) {
 		ID: "child", Version: "1.0", Extends: "core",
 		Types: map[string]TypeRules{
 			"claim":  {Required: []string{"confidence", "assessment"}, ListMin: map[string]int{"authors": 2}},
-			"source": {Required: []string{"authors"}},
+			"source": {Required: []string{"authors"}, Citation: &CitationRules{ForbiddenTargetTypes: []string{"question"}}},
 		},
 		Severities: map[string]string{"core-citation-unresolved": "error"},
 	}
@@ -176,13 +175,13 @@ func TestMergeIsAdditiveAndNonMutating(t *testing.T) {
 	if got.ID != "child" || got.Version != "1.0" || got.Extends != "core" {
 		t.Fatalf("identity should be the child's: %+v", got)
 	}
-	// claim: fields union (order-stable, no duplicate confidence); child tightens listMin.
+	// claim: fields union (order-stable, no duplicate confidence); child wins listMin.
 	claim := got.Types["claim"]
 	if len(claim.Required) != 2 || claim.Required[0] != "confidence" || claim.Required[1] != "assessment" {
 		t.Errorf("claim.Required = %v, want [confidence assessment]", claim.Required)
 	}
 	if claim.ListMin["authors"] != 2 {
-		t.Errorf("claim.ListMin[authors] = %d, want 2 (child tightens)", claim.ListMin["authors"])
+		t.Errorf("claim.ListMin[authors] = %d, want 2 (child wins on conflict)", claim.ListMin["authors"])
 	}
 	// parent-only and child-only types both survive.
 	if _, ok := got.Types["shared"]; !ok {
@@ -195,7 +194,24 @@ func TestMergeIsAdditiveAndNonMutating(t *testing.T) {
 	if got.Severities["core-broken-link"] != "warning" || got.Severities["core-citation-unresolved"] != "error" {
 		t.Errorf("severities not unioned: %v", got.Severities)
 	}
-	// inputs untouched.
+
+	// Deep-copy independence: mutating the RESULT must not reach either source,
+	// and mutating a SOURCE after Merge must not reach the result (no aliasing of
+	// inner slices, maps, or the Citation pointer).
+	got.Types["source"].Citation.ForbiddenTargetTypes[0] = "MUTATED"
+	if ext.Types["source"].Citation.ForbiddenTargetTypes[0] != "question" {
+		t.Error("mutating the resolved Citation slice reached the source (aliased)")
+	}
+	got.Severities["core-broken-link"] = "error"
+	if base.Severities["core-broken-link"] != "warning" {
+		t.Error("mutating the resolved Severities map reached the base (aliased)")
+	}
+	base.Types["shared"].Recommended[0] = "MUTATED"
+	if got.Types["shared"].Recommended[0] != "tags" {
+		t.Error("mutating the base slice after Merge reached the result (aliased)")
+	}
+
+	// inputs otherwise untouched by Merge itself.
 	if len(base.Types["claim"].Required) != 1 || base.Types["claim"].ListMin["authors"] != 1 {
 		t.Error("Merge mutated its base input")
 	}

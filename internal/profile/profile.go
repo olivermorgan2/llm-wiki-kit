@@ -184,14 +184,24 @@ func (l *Loader) resolve(id string) (Profile, error) {
 	return Merge(parent, child), nil
 }
 
-// Merge returns the one-level resolution of ext over its base parent (ADR-007):
-// additive and tightening only, never relaxing. The child's identity (id,
-// version, extends) is kept; rules are unioned so a page is validated by the
-// parent's rules plus the child's. Per-type rules union by type key; within a
-// shared type, field lists union (order-stable), maps take the child's value on
-// key conflict (a child tightening a parent constraint wins), and the child's
-// citation block replaces the parent's for that type. Severity overrides union
-// with the child winning. Merge never mutates its inputs.
+// Merge returns the one-level resolution of ext over its base parent (ADR-007).
+// The child's identity (id, version, extends) is kept; rules are unioned so a
+// page is validated by the parent's rules plus the child's. Per-type rules union
+// by type key; within a shared type, list fields union (order-stable) and
+// key-conflicting map entries and the citation block take the child's value.
+// Severity overrides union with the child winning.
+//
+// The "never relaxes core" guarantee (ADR-007) holds **structurally**, not by an
+// enforcement pass here: `core` — the only permitted parent (ADR-010
+// sub-decision 2) — contributes **no** per-type rules or severity overrides, so
+// there is nothing for a child to relax; the child-wins policy only ever ADDS.
+// If a future `core` ever gained behavior-bearing per-type data, this policy
+// would need a tightening check (max listMin, intersect enums, no severity
+// demotion) — recorded here so the assumption is explicit, not silent.
+//
+// The returned Profile is a **deep copy**: it shares no slice, map, or Citation
+// pointer with either input, so a caller may mutate the resolved profile without
+// disturbing the sources (or the embedded parse).
 func Merge(base, ext Profile) Profile {
 	out := Profile{
 		ID:         ext.ID,
@@ -201,13 +211,13 @@ func Merge(base, ext Profile) Profile {
 		Severities: map[string]string{},
 	}
 	for t, r := range base.Types {
-		out.Types[t] = r
+		out.Types[t] = cloneTypeRules(r)
 	}
 	for t, r := range ext.Types {
 		if existing, ok := out.Types[t]; ok {
 			out.Types[t] = mergeTypeRules(existing, r)
 		} else {
-			out.Types[t] = r
+			out.Types[t] = cloneTypeRules(r)
 		}
 	}
 	for code, sev := range base.Severities {
@@ -220,53 +230,113 @@ func Merge(base, ext Profile) Profile {
 }
 
 // mergeTypeRules unions two TypeRules for the same page type, child (ext) over
-// parent (base). List fields union preserving parent-then-child first-seen order;
-// scalar-valued maps take the child on conflict; the child's citation block, if
-// present, replaces the parent's.
+// parent (base), returning a value that aliases neither input. List fields union
+// preserving parent-then-child first-seen order; key-conflicting map entries take
+// the child; the child's citation block, if present, replaces the parent's.
 func mergeTypeRules(base, ext TypeRules) TypeRules {
 	out := TypeRules{
 		Required:         unionStrings(base.Required, ext.Required),
 		Recommended:      unionStrings(base.Recommended, ext.Recommended),
 		Enums:            mergeStringSliceMap(base.Enums, ext.Enums),
 		ListMin:          mergeIntMap(base.ListMin, ext.ListMin),
-		RecommendedAnyOf: append(append([][]string{}, base.RecommendedAnyOf...), ext.RecommendedAnyOf...),
+		RecommendedAnyOf: concatGroups(base.RecommendedAnyOf, ext.RecommendedAnyOf),
 		RequiredSections: unionStrings(base.RequiredSections, ext.RequiredSections),
 		EvidenceSections: unionStrings(base.EvidenceSections, ext.EvidenceSections),
-		Citation:         base.Citation,
+		Citation:         cloneCitation(base.Citation),
 	}
 	if ext.Citation != nil {
-		out.Citation = ext.Citation
+		out.Citation = cloneCitation(ext.Citation)
 	}
 	return out
 }
 
-// unionStrings returns the order-stable union of a and b (a's order first, then
-// b's new members), never mutating either input. A nil result is returned only
-// when both inputs are empty.
-func unionStrings(a, b []string) []string {
-	seen := map[string]bool{}
-	var out []string
-	for _, s := range append(append([]string{}, a...), b...) {
-		if !seen[s] {
-			seen[s] = true
-			out = append(out, s)
+// cloneTypeRules returns a deep copy of r that shares no backing storage with it,
+// so a parent-only or child-only type placed into a resolved profile cannot alias
+// the source profile (or the embedded parse).
+func cloneTypeRules(r TypeRules) TypeRules {
+	return TypeRules{
+		Required:         cloneStrings(r.Required),
+		Recommended:      cloneStrings(r.Recommended),
+		Enums:            mergeStringSliceMap(r.Enums, nil),
+		ListMin:          mergeIntMap(r.ListMin, nil),
+		RecommendedAnyOf: concatGroups(r.RecommendedAnyOf, nil),
+		RequiredSections: cloneStrings(r.RequiredSections),
+		EvidenceSections: cloneStrings(r.EvidenceSections),
+		Citation:         cloneCitation(r.Citation),
+	}
+}
+
+// cloneCitation returns a deep copy of c (nil for a nil input).
+func cloneCitation(c *CitationRules) *CitationRules {
+	if c == nil {
+		return nil
+	}
+	out := &CitationRules{ForbiddenTargetTypes: cloneStrings(c.ForbiddenTargetTypes)}
+	if c.RequireWhen != nil {
+		out.RequireWhen = make(map[string]string, len(c.RequireWhen))
+		for k, v := range c.RequireWhen {
+			out.RequireWhen[k] = v
 		}
 	}
 	return out
 }
 
+// cloneStrings copies a string slice, preserving nil-for-empty.
+func cloneStrings(s []string) []string {
+	if len(s) == 0 {
+		return nil
+	}
+	return append([]string(nil), s...)
+}
+
+// unionStrings returns the order-stable union of a and b (a's order first, then
+// b's new members) in a freshly-allocated slice, never mutating or aliasing
+// either input. A nil result is returned only when both inputs are empty.
+func unionStrings(a, b []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(src []string) {
+		for _, s := range src {
+			if !seen[s] {
+				seen[s] = true
+				out = append(out, s)
+			}
+		}
+	}
+	add(a)
+	add(b)
+	return out
+}
+
+// concatGroups appends b's groups after a's, deep-copying each inner slice so the
+// result aliases neither input. Returns nil only when both inputs are empty.
+func concatGroups(a, b [][]string) [][]string {
+	if len(a) == 0 && len(b) == 0 {
+		return nil
+	}
+	out := make([][]string, 0, len(a)+len(b))
+	for _, g := range a {
+		out = append(out, cloneStrings(g))
+	}
+	for _, g := range b {
+		out = append(out, cloneStrings(g))
+	}
+	return out
+}
+
 // mergeStringSliceMap unions two map[string][]string with the child (b) winning
-// on key conflict. Returns nil only when both inputs are empty.
+// on key conflict, deep-copying each value slice. Returns nil only when both
+// inputs are empty.
 func mergeStringSliceMap(a, b map[string][]string) map[string][]string {
 	if len(a) == 0 && len(b) == 0 {
 		return nil
 	}
 	out := map[string][]string{}
 	for k, v := range a {
-		out[k] = v
+		out[k] = cloneStrings(v)
 	}
 	for k, v := range b {
-		out[k] = v
+		out[k] = cloneStrings(v)
 	}
 	return out
 }
