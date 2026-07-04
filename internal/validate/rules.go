@@ -25,6 +25,15 @@ const (
 	codeCoreRecommended = "core-recommended-missing"
 	codeCoreKebab       = "core-kebab-filename"
 	codeCoreBrokenLink  = "core-broken-link"
+
+	// Citation rule codes (ADR-008 sub-decision 5). Engine-shipped default rules
+	// tagged ruleset:profile — the same ruleset as the core-broken-link they
+	// share a resolver with and subsume in evidence contexts. Severities are
+	// core defaults; a profile promotes them within ADR-004's configurable set
+	// (e.g. LLM_WIKI_SEVERITY=core-citation-unresolved=error) with no code change.
+	codeCoreCitationMalformed  = "core-citation-malformed"  // warning
+	codeCoreCitationUnresolved = "core-citation-unresolved" // warning
+	codeCoreCitationDuplicate  = "core-citation-duplicate"  // suggestion
 )
 
 // evaluatePage runs the OKF and core-profile rules over one page and returns
