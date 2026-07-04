@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -201,7 +202,10 @@ func TestWriteFileAtomicSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Stat dest: %v", err)
 	}
-	if info.Mode().Perm() != perm {
+	// POSIX perm bits are not representable through package os on Windows
+	// (writable files always stat 0666), so exact mode preservation is asserted
+	// on unix only. The atomic-write content assertion above runs everywhere.
+	if runtime.GOOS != "windows" && info.Mode().Perm() != perm {
 		t.Fatalf("perm = %v, want %v", info.Mode().Perm(), perm)
 	}
 }

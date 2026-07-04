@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"testing"
 
@@ -81,7 +82,10 @@ func assertTreeEqual(t *testing.T, want, got map[string]fileState) {
 		if string(g.data) != string(w.data) {
 			t.Fatalf("file %q content = %q, want %q", k, g.data, w.data)
 		}
-		if g.mode != w.mode {
+		// POSIX perm bits are not representable through package os on Windows
+		// (writable files always stat 0666), so mode preservation is asserted
+		// on unix only. Content/atomicity assertions above run everywhere.
+		if runtime.GOOS != "windows" && g.mode != w.mode {
 			t.Fatalf("file %q mode = %v, want %v", k, g.mode, w.mode)
 		}
 	}

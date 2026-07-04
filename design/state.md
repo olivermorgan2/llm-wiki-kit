@@ -177,9 +177,13 @@ Full accounting in [`../notes/eval-issue-039.md`](../notes/eval-issue-039.md).
 
 ## Notes / deferrals
 
-- **Windows permission-mode tests** — full suite red on windows-amd64
-  (`internal/fsafe` + `internal/txn`); pre-existing, predates Phase 3, not a
-  regression. Follow-up issue **#29** (still open, unfixed by Phase 3).
+- **Windows permission-mode tests** — full suite was red on windows-amd64
+  (`internal/fsafe` + `internal/txn`) on exact POSIX perm-bit assertions;
+  pre-existing, predated Phase 3, not a regression. **Resolved** by asserting
+  exact perm-bit preservation on unix only (POSIX modes are not representable
+  through package `os` on Windows, where writable files always stat `0666`);
+  content/atomicity/no-clobber assertions still run on all platforms. Test-only
+  change, production code untouched — issue **#29**/PR #52.
 - **macos-amd64 runner gap** — `macos-13` leg never dispatched (GitHub retired
   the macos-13 runner image 2025-12-08, so the label mapped to no runner); Phase
   3 closed with this leg unobserved, as Phase 2 did. **Resolved** by moving the
