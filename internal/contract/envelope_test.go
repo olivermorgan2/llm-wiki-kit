@@ -84,6 +84,38 @@ func TestPageEnvelopeCarriesSevenFields(t *testing.T) {
 	}
 }
 
+// A page plan envelope carries the six core fields plus exactly one optional
+// seventh field, plan, and never the page field (the two payloads are mutually
+// exclusive).
+func TestPagePlanEnvelopeCarriesSevenFields(t *testing.T) {
+	env := New("page plan", StatusSuccess)
+	env.Plan = &PagePlan{Path: "wiki/index.md", BaseAbsent: true, StagedHash: "abc123", Diff: "--- /dev/null\n"}
+
+	var buf bytes.Buffer
+	if err := env.WriteJSON(&buf); err != nil {
+		t.Fatalf("WriteJSON: %v", err)
+	}
+
+	var generic map[string]json.RawMessage
+	if err := json.Unmarshal(buf.Bytes(), &generic); err != nil {
+		t.Fatalf("emitted JSON does not parse: %v\n%s", err, buf.String())
+	}
+	for _, field := range []string{
+		"contractVersion", "operation", "status",
+		"findings", "affectedPaths", "approval", "plan",
+	} {
+		if _, ok := generic[field]; !ok {
+			t.Errorf("page plan envelope JSON is missing field %q; got: %s", field, buf.String())
+		}
+	}
+	if _, ok := generic["page"]; ok {
+		t.Errorf("page plan envelope must omit the page field; got: %s", buf.String())
+	}
+	if len(generic) != 7 {
+		t.Errorf("page plan envelope must carry exactly 7 fields, got %d: %s", len(generic), buf.String())
+	}
+}
+
 func TestNewEnvelopeDefaults(t *testing.T) {
 	env := New("validate", StatusSuccess)
 

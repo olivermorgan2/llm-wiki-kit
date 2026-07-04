@@ -1,8 +1,6 @@
 package yamladapter
 
 import (
-	"errors"
-
 	goccy "github.com/goccy/go-yaml"
 )
 
@@ -16,6 +14,15 @@ func New() Adapter {
 	return goccyAdapter{}
 }
 
+// OrderedMap is an order-preserving YAML mapping. Decoding YAML into an
+// *OrderedMap and re-encoding it round-trips every field — including ones the
+// engine does not model — with key order intact (ADR-001, criterion 6). It is
+// the representation page plan/apply use so unknown frontmatter survives the
+// staged-mutation cycle. The alias keeps goccy confined to this file: callers
+// build on yamladapter.OrderedMap and never import goccy, so a toolchain swap
+// stays localized here.
+type OrderedMap = goccy.MapSlice
+
 // Unmarshal decodes YAML data into v via goccy. Fields present in the source
 // but not modeled by v are ignored rather than rejected: the engine inspects
 // only the fields it models, and unknown-field round-trip preservation
@@ -24,12 +31,11 @@ func (goccyAdapter) Unmarshal(data []byte, v any) error {
 	return goccy.Unmarshal(data, v)
 }
 
-// errMarshalNotImplemented is returned by the Marshal stub. Round-trip
-// preservation of unknown frontmatter fields (criterion 6) is authored in
-// Slice 2; until then Marshal fails loudly rather than emitting lossy YAML.
-var errMarshalNotImplemented = errors.New("yamladapter: Marshal is not implemented (round-trip preservation lands in Slice 2, criterion 6)")
-
-// Marshal is a documented not-implemented stub. See errMarshalNotImplemented.
+// Marshal encodes v to YAML via goccy. Decoding frontmatter into an OrderedMap
+// and marshaling it back preserves key order and every field present in the
+// source, including ones the engine does not model — the round-trip guarantee
+// page plan/apply rely on so unknown frontmatter survives the staged-mutation
+// cycle (ADR-001, criterion 6).
 func (goccyAdapter) Marshal(v any) ([]byte, error) {
-	return nil, errMarshalNotImplemented
+	return goccy.Marshal(v)
 }

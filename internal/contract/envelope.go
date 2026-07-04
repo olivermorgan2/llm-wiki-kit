@@ -84,13 +84,34 @@ type PageReport struct {
 	ContentHash string `json:"contentHash"`
 }
 
+// PagePlan is the staged-mutation preview a page plan operation carries in the
+// envelope (ADR-006). It records the target's bundle-relative path, whether the
+// plan is a no-op (proposed content already matches the live page), the staging
+// transaction id binding the plan on disk (empty for a no-op), the captured
+// base state (BaseAbsent marks a new page's absent-target sentinel; BaseHash is
+// the live page's content hash otherwise), the staged-content hash, and a
+// unified diff preview. Like Page it is operation-scoped: present only for page
+// plan, nil (and omitted from JSON) everywhere else, so the six ADR-003 fields
+// stay the invariant shape. A plan never mutates live files — the diff and the
+// staged bytes live under .llm-wiki/staging/<transaction>/ until a later apply.
+type PagePlan struct {
+	Path        string `json:"path"`
+	NoOp        bool   `json:"noOp"`
+	Transaction string `json:"transaction,omitempty"`
+	BaseAbsent  bool   `json:"baseAbsent"`
+	BaseHash    string `json:"baseHash,omitempty"`
+	StagedHash  string `json:"stagedHash"`
+	Diff        string `json:"diff"`
+}
+
 // Envelope is the versioned response shape shared by every surface. It always
 // carries exactly the six ADR-003 fields: contractVersion, operation, status,
 // findings, affectedPaths, approval. Page-scoped operations additionally carry
-// an optional seventh field, page, which is nil (and omitted from JSON) for
-// every non-page operation, so the six-field shape is preserved everywhere
-// else (ADR-006 anticipates the envelope carrying page-plan payloads; this is
-// the first, read-only slot).
+// exactly one optional payload field — page (the read-only inspect report) or
+// plan (the staged-mutation preview) — which is nil (and omitted from JSON) for
+// every non-page operation, so the six-field shape is preserved everywhere else
+// (ADR-006 anticipated the envelope carrying page-plan payloads; page inspect
+// filled the first, read-only slot and page plan fills the second).
 type Envelope struct {
 	ContractVersion string      `json:"contractVersion"`
 	Operation       string      `json:"operation"`
@@ -99,6 +120,7 @@ type Envelope struct {
 	AffectedPaths   []string    `json:"affectedPaths"`
 	Approval        *Approval   `json:"approval"`
 	Page            *PageReport `json:"page,omitempty"`
+	Plan            *PagePlan   `json:"plan,omitempty"`
 }
 
 // New returns an envelope stamped with the current contract version for the

@@ -181,6 +181,12 @@ func Begin(boundary string, changes []FileChange) (*Txn, error) {
 	return t, nil
 }
 
+// ID returns the transaction's 16-hex-character id. It names the staging dir
+// (.llm-wiki/staging/<id>/) a staged-but-not-committed plan lives under, so a
+// preview (ADR-006 page plan) can report where its change set was staged and a
+// later apply can locate it.
+func (t *Txn) ID() string { return t.id }
+
 // Abort discards a staged transaction: the staging dir is removed and the user
 // tree is left exactly as it was (no commit has occurred). Further Commit/Abort
 // calls return ErrTxnDone.
