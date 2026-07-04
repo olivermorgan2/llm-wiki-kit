@@ -617,6 +617,70 @@ ADR-006/007/008/009 remains a standing flag, not a blocker.
 [`../design/build-out-plan.md`](../design/build-out-plan.md) §Phase 4; ADR-007
 already accepted.
 
+### 2026-07-04 — Phase 4 filed; ADR-010 (profile-data schema + rule vocabulary) drafted & accepted
+
+Filed the **Phase 4 — Academic-research profile** milestone (**#4**) and the
+eight backlog issues **#53–#60** (I1–I8) per the approved plan and
+[`../design/build-out-plan.md`](../design/build-out-plan.md) §Phase 4. Opened I1
+(**#53**): drafted **[ADR-010](../design/adr/adr-010-profile-data-schema-and-rule-vocabulary.md)**,
+which fixes the profile YAML schema surface ADR-007 deferred and instantiates the
+citation vocabulary ADR-008 sketched.
+
+- **Schema (Option A):** a **closed, per-type, declarative vocabulary** —
+  `required`/`recommended`/`enums`/`listMin`/`recommendedAnyOf`/`requiredSections`/
+  `evidenceSections`/`citation.{requireWhen,forbiddenTargetTypes}` — with the
+  engine owning fixed **rule kinds** and the profile supplying only their data. No
+  expression/conditional-section syntax (Q4 stays deferred). `requireWhen` is the
+  single, deliberately-weakest field-equals-value conditional.
+- **Core-rule boundary (golden-parity, binding on I2):** core `okf-*`/`core-*`
+  rules **stay engine-code and byte-identical**; `profiles/core/profile.yaml`
+  declares core's vocabulary *descriptively* only, so `extends: core` has a real
+  parent and the one-level merge is exercised. A fully-declarative core migration
+  is a separate golden-guarded future issue, out of Phase-4 scope.
+- **ADR-008 carry-in №2 (decided):** `profile-citation-required` fires on
+  **absence** of any citation in the designated evidence section; a
+  present-but-unresolved citation **satisfies** the obligation and independently
+  raises `core-citation-unresolved` (severity-promotable). Presence and
+  resolvability are separate axes — one target, one obligation verdict.
+- **ADR-008 carry-in №1 (decided):** repo-path resolution class 3 is explicitly
+  gated on `isIntraWiki` in `links.go` `classify`, so `//`/`#`/scheme targets
+  never reach a repo `stat`.
+- **Unknown types:** stay OKF/core-accepted; profile per-type rules fire only for
+  profiled types.
+- **Code namespace divergence from the plan:** the plan provisionally suggested an
+  `academic-*` prefix; ADR-010 uses the generic **`profile-*`** prefix
+  (`ruleset: profile`) for the new data-driven rule kinds, for consistency with
+  ADR-008's already-fixed `profile-citation-*` codes and because the rule kinds are
+  profile-agnostic engine capabilities. Taxonomy: `okf-*` (OKF), `core-*`
+  (engine-shipped defaults, `ruleset: profile`), `profile-*` (profile-data-driven,
+  `ruleset: profile`).
+- **ADR-numbering note:** the build-out plan provisionally reserved **ADR-010 for
+  index maintenance** (Phase 5); `adr-alloc` assigned the next free number to this
+  schema decision, so the index-maintenance ADR renumbers when Phase 5 lands.
+
+**Codex second-opinion review (2026-07-04):** verdict `NEEDS_REVISION` →
+addressed → the ADR was revised in the same PR (#61). Substantive fixes taken:
+(1) added the optional profile-level **`severities`** override key that ADR-008
+sub-decision 5(d) mandates (wired through the existing `validate.Resolve` layer;
+academic-research ships it empty since defaults already match addendum 003) — this
+is the mechanism by which "a required citation must *resolve*" is expressed
+(promote `core-citation-unresolved`), closing the one real vocabulary gap;
+(2) corrected the carry-in-№1 wording (http(s) is class 1, matched **before** the
+`isIntraWiki` gate, not class-4 malformed); (3) sharpened that `extends: core`
+inherits **engine-owned semantics** (core rules run for every page), with the core
+YAML as merge-parent + docs only — one source of truth for core behavior;
+(4) specified field presence/type/enum/list-min **one-finding precedence** to
+protect fixture parity for I3; (5) explicitly scoped advisory-only items
+(source summary section, synthesis links, `publication_date` ISO-8601) **out** of
+the gated vocabulary; (6) clarified `forbiddenTargetTypes` is a **denylist**
+(`[question]`), not a source-only allowlist, matching addendum 003's principle
+that URLs/repo-paths are valid evidence. Rejected as a misread: none.
+
+check-plan (adr criteria) PASS (C1–C5; C6 is the deferred v1 semantic-conflict
+check). Full CI matrix (5 platforms: test + selfcheck + bundle) green on PR #61.
+Accepted under the 2026-07-03 autonomous-phase mandate, **flagged for Oliver's
+async ratification** alongside ADR-006/007/008/009.
+
 ### 2026-06-30 — Knowledge layer reconciled to canonical file set
 
 Aligned `knowledge/` with the project's explicit layer spec: added
