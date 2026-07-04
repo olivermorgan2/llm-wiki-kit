@@ -104,14 +104,28 @@ type PagePlan struct {
 	Diff        string `json:"diff"`
 }
 
+// PageApply is the commit result a page apply operation carries in the envelope
+// (ADR-006). It records the applied staging transaction id and the committed
+// targets in commit order — the change set actually written to the tree. Like
+// Page and Plan it is operation-scoped: present only on a successful page apply,
+// nil (and omitted from JSON) everywhere else (including an apply refused for a
+// stale plan or a pending approval), so the six ADR-003 fields stay the invariant
+// shape. An apply commits exactly the previewed change set through the ADR-006
+// transaction layer; a stale plan or an un-granted approval commits nothing.
+type PageApply struct {
+	Transaction string   `json:"transaction"`
+	Committed   []string `json:"committed"`
+}
+
 // Envelope is the versioned response shape shared by every surface. It always
 // carries exactly the six ADR-003 fields: contractVersion, operation, status,
 // findings, affectedPaths, approval. Page-scoped operations additionally carry
-// exactly one optional payload field — page (the read-only inspect report) or
-// plan (the staged-mutation preview) — which is nil (and omitted from JSON) for
-// every non-page operation, so the six-field shape is preserved everywhere else
-// (ADR-006 anticipated the envelope carrying page-plan payloads; page inspect
-// filled the first, read-only slot and page plan fills the second).
+// exactly one optional payload field — page (the read-only inspect report), plan
+// (the staged-mutation preview), or apply (the commit result) — which is nil (and
+// omitted from JSON) for every non-page operation, so the six-field shape is
+// preserved everywhere else (ADR-006 anticipated the envelope carrying page
+// payloads; inspect filled the read-only slot, plan the preview slot, and apply
+// the commit slot).
 type Envelope struct {
 	ContractVersion string      `json:"contractVersion"`
 	Operation       string      `json:"operation"`
@@ -121,6 +135,7 @@ type Envelope struct {
 	Approval        *Approval   `json:"approval"`
 	Page            *PageReport `json:"page,omitempty"`
 	Plan            *PagePlan   `json:"plan,omitempty"`
+	Apply           *PageApply  `json:"apply,omitempty"`
 }
 
 // New returns an envelope stamped with the current contract version for the
