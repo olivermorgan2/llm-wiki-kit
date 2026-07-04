@@ -1,0 +1,23 @@
+# Core profile — the OKF + core-profile baseline every domain profile extends.
+#
+# ADR-010 sub-decision 2 (golden-parity): core's rules are ENGINE-OWNED and run
+# for every page regardless of the active profile, exactly as before Phase 4.
+# This file is the DESCRIPTIVE merge parent that makes `extends: core` a real,
+# testable one-level resolution (ADR-007); it is NOT behavior-bearing in Phase 4.
+# The engine emits every core-*/okf-* finding from Go, not from this data, so
+# editing a value here does not change core validation. A future fully-declarative
+# core migration — guarded by golden tests — is what would make this file
+# behavior-bearing; that is out of Phase-4 scope.
+profile:
+  id: core
+  version: "0.1.0"
+  # extends: (omitted) — core extends nothing (ADR-007, one inheritance level).
+
+# Core adds no per-type profile rules: its rules (required title/description,
+# field types, recommended fields, kebab filename, broken-link, core-citation-*)
+# are universal and engine-owned, not keyed on page `type`.
+types: {}
+
+# No per-rule severity overrides at the core layer; core-default severities are
+# the engine defaults.
+severities: {}
