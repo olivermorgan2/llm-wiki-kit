@@ -161,6 +161,23 @@ func TestProfileMultipleViolationsOnePerCode(t *testing.T) {
 	}
 }
 
+// An empty/whitespace string on a field that is required AND enum/list-min
+// constrained trips required-field ONLY — never enum or list-min too (ADR-010
+// one-finding precedence: ""/whitespace is "absent").
+func TestProfileEmptyStringIsRequiredFieldOnly(t *testing.T) {
+	// source_type is required + enum; authors is required + list-min.
+	got := runProfile(t, "s.md", "---\ntype: source\ntitle: S\ndescription: d\ntags: [x]\nauthors: \"\"\nsource_type: \"  \"\n---\n")
+	if n := len(findingsWithCode(got, codeProfileRequiredField)); n != 1 {
+		t.Errorf("required-field count = %d, want 1 (both empty fields aggregate)", n)
+	}
+	if n := len(findingsWithCode(got, codeProfileFieldEnum)); n != 0 {
+		t.Errorf("empty source_type must not also trip enum, got %d: %+v", n, got)
+	}
+	if n := len(findingsWithCode(got, codeProfileListMin)); n != 0 {
+		t.Errorf("empty authors must not also trip list-min, got %d: %+v", n, got)
+	}
+}
+
 // Severity overrides still compose via Resolve (ADR-004 profile-override layer):
 // a profile can promote profile-recommended-pair from suggestion to error.
 func TestProfileSeverityComposesViaResolve(t *testing.T) {

@@ -80,36 +80,46 @@ func absentFields(m map[string]any, required []string) []string {
 }
 
 // enumViolations returns "field=value" entries (fields sorted) for present fields
-// whose value lies outside the profile's allowed set. An absent field is skipped
-// (the required-field rule's concern); a non-scalar present value cannot match a
-// scalar set and is reported as a violation (ADR-010 sub-decision 3).
+// whose value lies outside the profile's allowed set. Presence is tested with the
+// same fieldPresent predicate as the required-field rule (ADR-010 sub-decision 3):
+// an absent field — including an empty/whitespace string, which is "absent" — is
+// skipped so it can only be the required-field rule's concern, never both. A
+// non-scalar present value cannot match a scalar set and is reported as a
+// violation.
+//
+// enums and listMin are authored on disjoint field shapes (a scalar-enum field vs
+// a list-min field), so no well-formed profile — including addendum 003's —
+// constrains one field with both; the "never trips both" invariant holds by
+// construction, and the engine does not police a self-contradictory profile that
+// declares a single field as both a scalar enum and a list.
 func enumViolations(m map[string]any, enums map[string][]string) []string {
 	var bad []string
 	for _, field := range sortedKeys(enums) {
-		v, ok := m[field]
-		if !ok || v == nil {
-			continue // absent: required-field's concern, not enum's.
+		if !fieldPresent(m, field) {
+			continue // absent (incl. ""/whitespace): required-field's concern, not enum's.
 		}
-		s, isStr := v.(string)
+		s, isStr := m[field].(string)
 		if !isStr || !containsString(enums[field], s) {
-			bad = append(bad, fmt.Sprintf("%s=%v", field, v))
+			bad = append(bad, fmt.Sprintf("%s=%v", field, m[field]))
 		}
 	}
 	return bad
 }
 
 // listMinViolations returns "field (min N)" entries (fields sorted) for present
-// fields that are not a YAML sequence of at least N items. An absent field is
-// skipped (required-field's concern); a present non-sequence or a too-short
-// sequence violates (ADR-010 sub-decision 3).
+// fields that are not a YAML sequence of at least N items. Presence uses the same
+// fieldPresent predicate as required-field (ADR-010 sub-decision 3): an absent
+// field — including an empty/whitespace string — is skipped, so `authors:`
+// omitted or `authors: ""` is required-field only, while `authors: []` or
+// `authors: "x"` (present, not a ≥N list) is list-min only. A field never trips
+// both required-field and list-min.
 func listMinViolations(m map[string]any, listMin map[string]int) []string {
 	var short []string
 	for _, field := range sortedIntMapKeys(listMin) {
-		v, ok := m[field]
-		if !ok || v == nil {
+		if !fieldPresent(m, field) {
 			continue
 		}
-		seq, isSeq := v.([]any)
+		seq, isSeq := m[field].([]any)
 		if !isSeq || len(seq) < listMin[field] {
 			short = append(short, fmt.Sprintf("%s (min %d)", field, listMin[field]))
 		}
