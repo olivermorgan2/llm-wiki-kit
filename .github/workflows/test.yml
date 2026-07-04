@@ -65,13 +65,16 @@ jobs:
       - name: go vet
         run: go vet ./...
 
-      - name: Acceptance corpus (Phase 2 gate evidence)
-        # Named, cache-defeating run of the criterion-traceable install/init
-        # acceptance corpus so the Phase 2 exit gate has legible per-platform
-        # evidence (one PASS line per criterion). It targets only ./cmd/llm-wiki
-        # and runs BEFORE the full `go test ./...` so the acceptance evidence is
-        # produced on every leg even if an unrelated package's suite is red on
-        # that platform. bash avoids pwsh quoting on the Windows leg.
+      - name: Acceptance corpus (Phase 2+3 gate evidence)
+        # Named, cache-defeating run of the criterion-traceable acceptance corpus
+        # so the Phase 2 (install/init) and Phase 3 (authoring + staged mutation)
+        # exit gates each have legible per-platform evidence (one PASS line per
+        # criterion). The single `^TestAcceptance` pattern selects both the Phase
+        # 2 corpus (acceptance_test.go) and the Phase 3 corpus
+        # (acceptance_phase3_test.go). It targets only ./cmd/llm-wiki and runs
+        # BEFORE the full `go test ./...` so the acceptance evidence is produced
+        # on every leg even if an unrelated package's suite is red on that
+        # platform. bash avoids pwsh quoting on the Windows leg.
         shell: bash
         run: go test ./cmd/llm-wiki -run '^TestAcceptance' -count=1 -v
 
