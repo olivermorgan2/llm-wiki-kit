@@ -101,22 +101,79 @@ func (e *Engine) Run(fsys fs.FS) []contract.Finding {
 		bundleDir:   e.opts.BundleDir,
 		repoResolve: e.opts.RepoResolve,
 	}
+
+	// Pre-pass: record every page's frontmatter `type` so a cross-page citation
+	// rule (a claim citing a `question`, ADR-010 sub-decision 4) can read the
+	// target page's type. Links may point forward in the walk, so all types must
+	// be known before any page is evaluated. Unparseable frontmatter contributes
+	// no type (its page gets okf-yaml-parse and no citation-target verdict).
+	pageTypes := map[string]string{}
+	for _, pg := range pages {
+		if fm, _, err := splitFrontmatter(pg.content); err == nil {
+			var mm map[string]any
+			if e.yaml.Unmarshal(fm, &mm) == nil {
+				if t, ok := mm["type"].(string); ok {
+					pageTypes[pg.path] = t
+				}
+			}
+		}
+	}
+
 	for _, pg := range pages {
 		out = append(out, evaluatePage(e.yaml, pg.path, pg.content)...)
-		// Link/citation resolution and the profile type rules need the page body
-		// and frontmatter; a page whose frontmatter fails to split already yields
+		// Link/citation resolution and the profile rules need the page body and
+		// frontmatter; a page whose frontmatter fails to split already yields
 		// okf-yaml-parse and gets none of them (the parse-failure gate is
 		// inherited). splitFrontmatter is re-run here rather than threaded out of
 		// evaluatePage so evaluatePage's signature — and its many unit-test call
 		// sites — stay unchanged.
 		if fm, body, err := splitFrontmatter(pg.content); err == nil {
-			out = append(out, linkRules(pg.path, body, res, e.opts.EvidenceSections)...)
-			// Profile type rules run only over frontmatter that also parses as YAML
-			// (the same gate evaluatePage applies before emitting core findings).
+			// Profile type/citation rules run only over frontmatter that also
+			// parses as YAML (the same gate evaluatePage applies).
 			var m map[string]any
-			if e.yaml.Unmarshal(fm, &m) == nil {
-				out = append(out, profileTypeFindings(e.opts.Profile, pg.path, m, body)...)
+			parsed := e.yaml.Unmarshal(fm, &m) == nil
+			pageType := ""
+			if parsed {
+				pageType, _ = m["type"].(string)
 			}
+			// A page's evidence contexts are the global (env) designation unioned
+			// with its profile type's evidence sections (ADR-010 sub-decision 4).
+			// core-citation-* findings evaluate over this union so env-designated
+			// sections keep working (Phase 3 parity); the citation OBLIGATION uses
+			// the profile's per-type sections only (profileCitationFindings).
+			evSections := evidenceSectionsFor(e.opts, pageType)
+			out = append(out, linkRules(pg.path, body, res, evSections)...)
+			if parsed {
+				out = append(out, profileTypeFindings(e.opts.Profile, pg.path, m, body)...)
+				out = append(out, profileCitationFindings(e.opts.Profile, pg.path, m, body, res, pageTypes)...)
+			}
+		}
+	}
+	return out
+}
+
+// evidenceSectionsFor returns the evidence-context section titles that apply to a
+// page of pageType: the global Options.EvidenceSections (the demoted
+// LLM_WIKI_EVIDENCE_SECTIONS override) unioned with the resolved profile type's
+// EvidenceSections. The union is order-stable and deduplicated; an empty result
+// is the zero-cost default where no link is ever a citation.
+func evidenceSectionsFor(opts Options, pageType string) []string {
+	profSections := opts.Profile.Types[pageType].EvidenceSections
+	if len(opts.EvidenceSections) == 0 && len(profSections) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, s := range opts.EvidenceSections {
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
+		}
+	}
+	for _, s := range profSections {
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
 		}
 	}
 	return out

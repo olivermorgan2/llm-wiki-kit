@@ -198,10 +198,12 @@ func severityOverrides(config string) map[string]contract.Severity {
 // yields nil — the zero-cost default where no link is ever a citation, so the
 // engine behaves byte-identically to a run with citations disabled.
 //
-// This is the interim wiring channel for evidence-context designation, mirroring
-// the LLM_WIKI_SEVERITY precedent; profile-loaded evidence vocabulary is Phase 4
-// work that will supersede or augment it. It is engine configuration, not
-// profile-specific citation vocabulary.
+// As of Phase 4 this env channel is DEMOTED to an explicit override: the primary
+// evidence-context designation now comes from the active profile's per-type
+// `evidenceSections` (ADR-010 sub-decision 4), and the engine unions this global
+// override on top (validate.evidenceSectionsFor). An unset variable yields nil,
+// so a core bundle with no profile evidence sections behaves byte-identically to
+// the pre-citation engine. It is engine configuration, not profile vocabulary.
 func evidenceSections() []string {
 	var out []string
 	for _, s := range strings.Split(os.Getenv("LLM_WIKI_EVIDENCE_SECTIONS"), ",") {
@@ -210,6 +212,32 @@ func evidenceSections() []string {
 		}
 	}
 	return out
+}
+
+// activeProfile resolves the validation profile a bundle rooted at root declares
+// in its llm-wiki.yaml `profile.id` (ADR-007 — the config records a reference to
+// the shipped profile, ADR-009). A missing/unreadable config, absent id, or an
+// id that no longer resolves falls back to the zero Profile, so validation runs
+// with OKF/core rules only and a bundle without a recognized profile still
+// validates. YAML is read through the ADR-001 adapter.
+func activeProfile(root string) profile.Profile {
+	data, err := os.ReadFile(filepath.Join(root, "llm-wiki.yaml"))
+	if err != nil {
+		return profile.Profile{}
+	}
+	var cfg struct {
+		Profile struct {
+			ID string `yaml:"id"`
+		} `yaml:"profile"`
+	}
+	if yamladapter.New().Unmarshal(data, &cfg) != nil || cfg.Profile.ID == "" {
+		return profile.Profile{}
+	}
+	p, err := profile.Resolve(cfg.Profile.ID)
+	if err != nil {
+		return profile.Profile{}
+	}
+	return p
 }
 
 func runVersion(stdout io.Writer, jsonMode bool) int {
@@ -391,12 +419,14 @@ func runValidate(args []string, stdout io.Writer, jsonMode bool) int {
 
 	// Anchor the repo-path resolution class at the nearest .llm-wiki/ marker
 	// (ADR-008 sub-decision 3); ok=false falls back to the zero Options, which is
-	// byte-identical to the pre-citation engine. Evidence contexts come from
-	// LLM_WIKI_EVIDENCE_SECTIONS (the interim channel until profile loading lands
-	// in Phase 4); page inspect and page plan wire this identically so all three
-	// agree on which links are citations (criterion 15).
+	// byte-identical to the pre-citation engine. The active profile (from
+	// llm-wiki.yaml) drives per-type structural + citation rules and per-type
+	// evidence-context designation (ADR-010); LLM_WIKI_EVIDENCE_SECTIONS is the
+	// demoted global override. page inspect and page plan wire this identically so
+	// all three agree on which links are citations (criterion 15).
 	opts, _ := validate.AnchorRepo(root)
 	opts.EvidenceSections = evidenceSections()
+	opts.Profile = activeProfile(root)
 	findings := validate.NewWithOptions(yamladapter.New(), opts).Run(os.DirFS(root))
 	findings = validate.Resolve(findings, severityOverrides(os.Getenv("LLM_WIKI_SEVERITY")))
 	status := validate.StatusFor(findings)
@@ -621,9 +651,11 @@ func runPagePlan(args []string, stdout, stderr io.Writer, jsonMode bool) int {
 
 	// Wire the ADR-008 citation resolution the same way validate/inspect do so the
 	// gate never fires on citations validate cannot see (criterion 15): the
-	// repo-path anchor plus the interim evidence-section channel.
+	// repo-path anchor, the active profile (per-type evidence sections + rules),
+	// and the demoted evidence-section override.
 	opts, _ := validate.AnchorRepo(root)
 	opts.EvidenceSections = evidenceSections()
+	opts.Profile = activeProfile(root)
 	result, err := plan.Plan(root, pagePath, proposed, yamladapter.New(), opts)
 	if err != nil {
 		switch {
