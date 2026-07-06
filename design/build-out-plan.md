@@ -204,21 +204,26 @@ llm-wiki-kit/                  # the plugin/engine source repo (what we build)
 - **Exit criteria:** acceptance criterion **4 (academic-research)** plus the
   addendum-003 fixtures pass. **Completes the must-pass spine.**
 
-### Phase 5: Enrichment + index maintenance (Slice 4 — in-MVP hardening)
+### Phase 5: Enrichment + index maintenance (Slice 4 — in-MVP hardening) ✅
 
-- **Goal:** extend the staged path to existing-page enrichment and keep
-  indexes deterministically current.
-- **Scope:**
-  - Enrichment skill on existing pages via the same plan/apply path; preview
-    before apply; preserve citations and unknown fields.
-  - Deterministic index maintenance: no model calls, stable ordering,
-    dry-run/diff.
-- **ADR dependencies:** ADR-010 (index maintenance), ADR-006 (reused staged
-  mutation).
-- **Deliverables:** enrichment skill + adapter; index command with dry-run;
-  enrichment preview fixtures; index-stability tests.
-- **Exit criteria:** acceptance criterion **11 (enrichment)** plus index
-  reliability (PRD §14: deterministic regeneration, no model call) hold.
+|- **Goal:** extend the staged path to existing-page enrichment and keep
+|  indexes deterministically current.
+|- **Status:** Implementation complete (commit 9b1886a). See PR
+|  [phase5-enrichment-rebuild](https://github.com/olivermorgan2/llm-wiki-kit/pull/new/phase5-enrichment-rebuild).
+|- **Scope:**
+|  - Enrichment skill on existing pages via the same plan/apply path; preview
+|    before apply; preserve citations and unknown fields. ✅
+|  - Deterministic index maintenance: no model calls, stable ordering,
+|    dry-run/diff. ✅
+|- **ADR dependencies:** ADR-010 (index maintenance), ADR-006 (reused staged
+|  mutation).
+|- **Deliverables:** enrichment skill + adapter; index command with dry-run;
+|  enrichment preview fixtures; index-stability tests. ✅
+|- **Exit criteria:** acceptance criterion **11 (enrichment)** plus index
+|  reliability (PRD §14: deterministic regeneration, no model call) hold.
+|  Unit tests and CI workflow implemented.
+|- **Cross-surface parity testing:** Added validation framework in
+|  `internal/validate/validate.go` with multi-mode execution verification.
 
 ### Phase 6: Hooks + CI (Slice 5 — in-MVP hardening)
 

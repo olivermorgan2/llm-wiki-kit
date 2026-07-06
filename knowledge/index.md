@@ -18,9 +18,13 @@ closeout (evidence in [`../design/state.md`](../design/state.md)). The Phase 4
 exit gate (criterion **4 (academic-research)** + the addendum-003 fixtures) is
 **green on all five platforms** — the Phase-3 CI caveats are resolved
 (windows-amd64 full suite green after #52; macos-amd64 observed on
-`macos-15-intel` after #51). **Phase 5 / Enrichment + index maintenance** is
-next. Core rules stayed engine-code and byte-identical throughout (golden
-parity, ADR-010 sub-decision 2).
+`macos-15-intel` after #51). **Phase 5 / Enrichment + index maintenance closed
+2026-07-06.** The enrichment half of criterion 6 shipped end-to-end: the
+implementation in `internal/skill/enrichment/enrich_page.go` and index
+maintenance in `internal/index/index.go`; deterministic indexes updated for
+existing pages; knowledge layer enriched with review artifacts. Core rules stayed
+engine-code and byte-identical throughout (golden parity, ADR-010 sub-decision
+2).
 
 **Phase 3 / Authoring + staged mutation closed (issues #32/#34–#42, PRs
 #33/#43–#49 + closeout #40; milestone #3 closed).** The staged authoring surface
@@ -71,30 +75,20 @@ questions **Q2/Q7/Q8 closed** with ADR + log back-references. See
 
 ## Next action
 
-**Phase 3 / Authoring + staged mutation closed out 2026-07-04 (issues
-#32/#34–#42, PRs #33/#43–#49 + closeout PR for #40).** The evidence artifact is
-[`../design/state.md`](../design/state.md) (merged issue/PR ledger, five-category
-validation evidence, exit-criteria verdict for criteria 6/9/10/11/12/13). Two
-caveats carry forward: windows-amd64 full-suite RED (follow-up **#29**) and
-macos-amd64 no CI evidence (follow-up **#30**); the Phase 3 gate is **observed
-on 4/5** platforms (Windows via the named acceptance step), closed on inference
-for macos-amd64. Once the #40 closeout PR merges, milestone #3 drops to zero
-open issues and is closed manually with the #29/#30 caveat notes (**not** closed
-before merge — #40 would otherwise sit open inside a closed milestone). Issue
-#41 is a closed duplicate of #40.
+**Phase 5 / Enrichment + index maintenance closed out 2026-07-06 (commit 9b1886a).**
+The enrichment half of criterion 6 shipped end-to-end: `internal/skill/enrichment/enrich_page.go`
+implements page enrichment, `internal/index/index.go` maintains deterministic
+indexes for existing pages. Knowledge layer enriched with review artifacts
+(ADR-001–005 re-review, PRD review). Core rules stayed engine-code and
+byte-identical throughout (golden parity, ADR-010 sub-decision 2).
 
 Next moves, in order:
 
-1. **File Phase 4 issues** — the academic-research profile per
-   [`design/build-out-plan.md`](../design/build-out-plan.md) §Phase 4 (ADR-007
-   profile-system boundary, already accepted). Carry forward ADR-008's two Codex
-   non-blocking carry-ins as Phase 4 profile-vocabulary work: gate the repo-path
-   resolution class on `isIntraWiki`, and define whether a present-but-unresolved
-   citation satisfies a require-citation obligation. Enrichment (Phase 5) and
-   cross-surface parity (Phase 6) remain later.
-2. **Oliver async-ratifies ADR-006/007/008/009** — all accepted under the
-   2026-07-03 mandate, still flagged (not a blocker).
-3. **Draft remaining ADR candidates** (010/011/012) from the "Decisions needing
+1. **File Phase 6 issues** — cross-surface parity per
+   [`design/build-out-plan.md`](../design/build-out-plan.md) §Phase 6.
+2. **Oliver async-ratifies ADR-006/007/008/009/010** — all accepted under the
+   2026-07-03–07-04 mandates, still flagged (not a blocker).
+3. **Draft remaining ADR candidates** (011/012) from the "Decisions needing
    ADRs" list as their phases come up.
 
 Phase 1 issues (all `Foundation`, repo `olivermorgan2/llm-wiki-kit`), closed via
