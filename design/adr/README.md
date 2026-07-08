@@ -25,5 +25,6 @@ outside the fences is preserved.
 | [ADR-008](adr-008-provenance-and-citation-model.md) | Provenance and citation model (context-based, deterministic offline resolution) | accepted |
 | [ADR-009](adr-009-install-upgrade-uninstall-ownership.md) | Install / upgrade / uninstall asset-ownership model | accepted |
 | [ADR-010](adr-010-profile-data-schema-and-rule-vocabulary.md) | Declarative profile-data schema and profile rule / citation vocabulary | accepted |
+| [ADR-011](adr-011-deterministic-index-maintenance.md) | Deterministic index maintenance (fenced generated regions, staged writes) | proposed |
 
 <!-- adr-index:end -->
