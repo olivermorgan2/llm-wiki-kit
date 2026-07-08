@@ -135,8 +135,12 @@ following sub-decisions are load-bearing and fixed here; each maps to an issue
 
 The MVP maintains **exactly one** generated index: the OKF-reserved
 bundle-root **`index.md`** (`wiki/index.md` in the reference layout), with
-per-type sections *inside* a single generated region. There are **no** separate
-per-type index files and **no** profile-specific index files in the MVP. This is
+per-type sections *inside* a single generated region. The **exact markdown
+format** of that region (section headers, list structure, per-entry layout) is
+deliberately **not** fixed here — an ADR fixes decisions, not byte formats — and
+is left for the implementation issue(s) to define and lock behind fixtures (see
+Consequences). There are **no** separate per-type index files and **no**
+profile-specific index files in the MVP. This is
 deferred, not forgotten: each additional generated file multiplies the staleness
 and human-preservation surface, and a *profile-configurable* index view would
 extend ADR-010's **closed** profile vocabulary, which by ADR-010's own rule
@@ -148,9 +152,11 @@ concern.
 ### 2. Derivation from page metadata (scope item 2)
 
 Index entries are derived **solely** from page frontmatter already parsed by the
-engine — `type`, `title`, `description` — plus the bundle-relative path, read
-through the existing ADR-001 `yamladapter`. There is **no new parser and no body
-scraping**. Missing-metadata behavior is fixed and total:
+engine — `type`, `title`, `description` — plus the **bundle-relative path**
+(taken relative to the same bundle boundary [ADR-005](adr-005-safe-filesystem-layer.md)
+uses for path/symlink safety and [ADR-006](adr-006-staged-mutation-transaction-model.md)
+uses for its staging root — this ADR defines no new boundary), read through the
+existing ADR-001 `yamladapter`. There is **no new parser and no body scraping**. Missing-metadata behavior is fixed and total:
 
 - **`title`** absent or empty → fall back to the **filename stem** (so every
   indexed page has a display label).
@@ -180,7 +186,11 @@ is **byte-preserved**. Edge cases are fixed:
 
 - **Fences absent:** the engine **never silently rewrites** the file. Dry-run
   shows an *append-a-fenced-region-at-end* proposal; it applies only through the
-  staged path (sub-decision 7), never as an in-place overwrite.
+  staged path (sub-decision 7), never as an in-place overwrite. The
+  dry-run/staged-plan preview shows the **full file diff** (not just the appended
+  region), so if the end-of-file placement would land after human-authored
+  trailing content the user does not want the region below, the user can **abort
+  before apply** and reposition a fence pair by hand first.
 - **Duplicate, nested, or unterminated fences:** the engine **refuses** to mutate
   and emits a finding (sub-decision 5); it never guesses which region is
   authoritative.
@@ -190,8 +200,9 @@ is **byte-preserved**. Edge cases are fixed:
 ### 4. Stable ordering, duplicates, byte-idempotency (scope item 4)
 
 - **Duplicates are structurally impossible:** entries are keyed on the
-  **bundle-relative path**, one entry per page, so FR9's "avoid duplicate
-  entries" holds by construction rather than by a de-dup pass.
+  **bundle-relative path** (the ADR-005/ADR-006 bundle boundary, as defined in
+  sub-decision 2), one entry per page, so FR9's "avoid duplicate entries" holds
+  by construction rather than by a de-dup pass.
 - **Sort key:** `type` (bytewise ascending), then bundle-relative path (bytewise
   ascending). Titles are **display-only and never sort keys**, avoiding
   locale/case-fold nondeterminism. Ordering is thus stable and
@@ -282,6 +293,13 @@ uncover a genuinely new enrichment decision boundary, the correct move is to
 - **Maintain:** the fence names (`llm-wiki:index:start`/`:end`), the sort key,
   the `core-index-stale` and `core-index-unmanaged` codes and their warning
   defaults, and the no-model-call / stdlib-only / no-new-dependency constraints.
+- **Implementation must define and fixture the generated-region format.** This
+  ADR fixes *what* is derived and *how it is bounded and ordered*, but not the
+  concrete markdown of the region (section headers, list/entry layout). The
+  implementation issue(s) must **specify that format and lock it behind golden
+  fixtures**, since byte-idempotency (sub-decision 4) and stale detection
+  (sub-decision 5) both compare against exactly those bytes — an unpinned format
+  would make both invariants untestable.
 - **Deferred / out of scope:** per-type and profile-specific index files;
   a profile-configurable index vocabulary (would extend ADR-010's closed
   vocabulary → new ADR); sub-bundle indexes; and `log.md` maintenance (not an

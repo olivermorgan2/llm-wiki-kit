@@ -905,3 +905,58 @@ preservation), Option C (per-plan coupling), and model-assisted curation
   next-action edits were authored by the Builder session running **Claude Opus
   4.8** — an equal-or-higher curator substitution, recorded here per the overlay,
   matching the 2026-07-08 ratification-entry precedent.
+
+### 2026-07-08 — ADR-011 Qwen3.7 Max adversarial review — verdict `READY` (4/5), no blockers
+
+The independent cross-vendor adversarial review of **ADR-011** (deterministic
+index maintenance) ran with **Qwen3.7 Max via OpenRouter** (`qwen/qwen3.7-max`),
+the overlay-legal substitute for OpenAI Codex (non-Anthropic, cross-vendor,
+context-independent from the author; substitution approved by Oliver and recorded
+on issue #76 and in the 2026-07-08 drafting entry above). Verdict **`READY`**,
+score **4/5**, **no blocking findings**. The verbatim artifact is archived at
+[`reviews/2026-07-08-qwen-adr-011-review.md`](reviews/2026-07-08-qwen-adr-011-review.md).
+
+The review confirmed all **9 issue-#76 scope items** are decided or explicitly
+deferred with rationale, found **no contradictions** with accepted
+ADR-003/004/005/006/008/010 or PRD FR9/§14, judged the one contestable call
+(standalone ADR-006 staged operation vs folding `index.md` into every page plan)
+well-argued and honestly presented, and mapped every normative claim to a
+testable assertion. Evidence honesty and workflow correctness checked out
+(status `proposed`, no false acceptance claims, reviewer substitution recorded,
+numbering correction reconciled without editing ADR-004 in place).
+
+**Three non-blocking clarity findings — all folded into the ADR-011 draft this
+session (decision content unchanged, status stays `proposed`):**
+
+1. **Bundle-relative path traceability** — sub-decisions 2 and 4 now state the
+   bundle-relative path is taken relative to the same boundary ADR-005 (path/
+   symlink safety) and ADR-006 (staging root) use; ADR-011 defines no new
+   boundary.
+2. **Generated-region format callout** — sub-decision 1 now says the exact
+   markdown format of the region is deliberately not fixed by the ADR, and a new
+   Consequences bullet requires the implementation issue(s) to define that format
+   and lock it behind golden fixtures (byte-idempotency and stale detection both
+   compare exactly those bytes).
+3. **Fence-absent append edge case** — sub-decision 3 now clarifies the
+   dry-run/staged-plan preview shows the **full file diff**, so a user can abort
+   before apply if the end-of-file append placement would land after
+   human-authored trailing content, and reposition a fence pair by hand first.
+
+**Gate status:** ADR-011 is **`READY` for Oliver's explicit acceptance**. Status
+flips `proposed` → `accepted` only after Oliver accepts, in the same PR before
+merge, keeping ratification debt at 0. **Phase 5 implementation issues I2–I7
+remain blocked until ADR-011 is accepted and merged** — the live next action is
+Oliver's acceptance, **not** implementation. (Hermes may run a final Qwen
+re-review over these clarity edits before acceptance.)
+
+- **Validation (this session):** `.claude/bin/sync-adr-index --check` in sync
+  (11 rows); `check-plan --criteria-set adr` on ADR-011 deterministic
+  **ADR-C1–C4 PASS** (C5/C6 standing warnings); `git diff --check` clean;
+  placeholder scan clean on added lines; review artifact contains `Verdict: READY`
+  and `Score: 4/5`; `GOTOOLCHAIN=local go test ./...` green (docs-only change).
+  No product/source code written; no accepted ADR edited in place; not pushed /
+  no PR.
+- **Role/model substitution:** curator role is Claude Haiku; this entry and the
+  paired `knowledge/index.md` / `design/state.md` edits were authored by the
+  Builder session running **Claude Opus 4.8** — an equal-or-higher curator
+  substitution, recorded per the overlay.
