@@ -19,17 +19,18 @@ above all, no author ever reviews its own work.
 | Planner / orchestrator | Claude Fable 5 | Claude Opus 4.8 if Fable is unavailable | PRD → MVP → ADR drafting, issue planning, closeouts, session driving. |
 | Builder | Claude Opus 4.8 | — | Implementation sessions: one issue, one branch, one PR; tests green. |
 | Knowledge-layer curator | Claude Haiku | planner model | Maintains `knowledge/` (log, index, risks, open questions) per `SCHEMA.md`. Curates and records; closeout content still passes the closeout gates. |
-| Adversarial reviewer | OpenAI Codex | another **non-Anthropic** reviewer of equivalent rigor | Must be cross-vendor and context-independent from the author. Unavailable → HALT (see below); the author's own model family re-reading the artifact is not a review. |
+| Adversarial reviewer | Claude Opus 4.8 (Anthropic subscription) | — | Fresh-context independence: reviewer runs in a new session with no access to the builder's conversation or artifacts. Same model family as the Builder, but context-separated — not a re-read of the author's own work. Review must be adversarial, not rubber-stamp. Unavailable → HALT (see below). |
 | Guard + branch protection | no model (deterministic CI + GitHub settings) | — | Deliberately non-agentic; cannot be argued with. |
 
 ### Gates cannot be skipped, only failed
 
 - **Adversarial review is a hard gate.** Every ADR, PRD/normalization
-  output, and phase closeout gets an independent adversarial review (Codex
-  or equivalent) reaching `READY` before acceptance/merge. If the reviewer
-  is unavailable (usage limit, outage, missing CLI): **HALT the phase and
-  report to Oliver.** "Review deferred, covered by tests" is exactly the
-  rationalization that caused the failure — it is forbidden.
+  output, and phase closeout gets a fresh-context adversarial review (Opus
+  4.8 in a new session, or equivalent) reaching `READY` before
+  acceptance/merge. If the reviewer is unavailable (usage limit, outage):
+  **HALT the phase and report to Oliver.** "Review deferred, covered by
+  tests" is exactly the rationalization that caused the failure — it is
+  forbidden.
 - **No mandate may remove a gate.** An autonomous-phase mandate can
   delegate *who operates* a gate, never whether it runs. Plan-first
   approval, issue-per-PR, adversarial review, and green tests apply in
