@@ -5,28 +5,44 @@ Front door to the `llm-wiki-kit` knowledge layer. Conventions live in
 
 ## Current phase
 
-**2026-07-08 — Phase 5 / Enrichment + index maintenance: ADR-011 (`proposed`) — Qwen3.7 Max review `READY` (4/5); next action is Oliver acceptance.**
+**2026-07-08 — Phase 5 / Enrichment + index maintenance: issues filed, ready to build.**
 Phase 4 is the last closed phase. Oliver ratified ADR-006/007/008/009/010 on
-2026-07-08; ratification debt is 0. Phase 5 milestone (**#5**) and issue backlog
-I1 (**#76**, label `design`) are filed; **[ADR-011](../design/adr/adr-011-deterministic-index-maintenance.md)
-(deterministic index maintenance) is drafted `proposed`** on branch
-`docs/adr-011-index-maintenance` (Option A: fenced generated regions in the
+2026-07-08; ratification debt is 0. Phase 5 milestone (**#5**) is active;
+**[ADR-011](../design/adr/adr-011-deterministic-index-maintenance.md)
+(deterministic index maintenance) is `accepted`** (Option A: fenced generated regions in the
 OKF-reserved `index.md`, standalone ADR-006 staged write, `core-index-stale`
-warning). The **adversarial review — Qwen3.7 Max via OpenRouter**
-(`qwen/qwen3.7-max`, substituted for Codex; overlay-legal, recorded on issue #76
-and in [`log.md`](log.md)) has now **run and returned `READY`, score 4/5, no
-blockers** ([artifact](reviews/2026-07-08-qwen-adr-011-review.md)); its three
-non-blocking clarity findings are **folded into the draft** (decision content
-unchanged, status stays `proposed`). The next action is therefore **Oliver's
-explicit acceptance** of ADR-011 — **not** implementation; **ADR-011 remains the
-gate-blocking prerequisite before Phase 5 implementation issues I2–I7 open**,
-unblocking only on that acceptance + merge. (Hermes may run a final Qwen
-re-review over the clarity edits before acceptance.) The provisional build-out
-plan called this ADR-010, but that number is now the Phase 4 profile-data schema
-ADR; the index-maintenance ADR takes the next free number, ADR-011. `main` is
+warn). The **adversarial review of the ADR-011 draft — Qwen3.7 Max via OpenRouter**
+(`qwen/qwen3.7-max`, substituted for Codex; overlay-legal, recorded on issue
+[#76](https://github.com/olivermorgan2/llm-wiki-kit/issues/76) and in
+[`log.md`](log.md)) returned `READY`, score 4/5, no blockers
+([artifact](reviews/2026-07-08-qwen-adr-011-review.md)); its three non-blocking
+clarity findings were folded into the draft before acceptance. Oliver then
+explicitly accepted ADR-011 on 2026-07-08, flipping status `proposed` →
+`accepted` in PR [#79](https://github.com/olivermorgan2/llm-wiki-kit/pull/79),
+keeping ratification debt at 0.
+
+**Phase 5 implementation issues are now filed** and work can begin:
+
+- Enrichment track (I1):
+  - [#80](https://github.com/olivermorgan2/llm-wiki-kit/issues/80): enrichment skill adapter (reuses page plan/apply machinery)
+  - [#81](https://github.com/olivermorgan2/llm-wiki-kit/issues/81): enrichment preview fixtures (core + academic-research)
+- Index track (I2-I7):
+  - [#82](https://github.com/olivermorgan2/llm-wiki-kit/issues/82): core index generation and fenced-region parsing (Option A)
+  - [#83](https://github.com/olivermorgan2/llm-wiki-kit/issues/83): index CLI command with --dry-run and ADR-006 routing
+  - [#84](https://github.com/olivermorgan2/llm-wiki-kit/issues/84): index stability tests (byte-idempotency, human section preservation)
+  - [#85](https://github.com/olivermorgan2/llm-wiki-kit/issues/85): `core-index-stale` validation finding (ADR-004 framework)
+  - [#86](https://github.com/olivermorgan2/llm-wiki-kit/issues/86): init fence scaffolding (Phase 2 backfill)
+
+**Phase 5 plan** ([phase-5-plan.md](../phase-5-plan.md)) passed adversarial
+review by Qwen3.7 Max (verdict: READY, score 4/5) after incorporating 9
+findings: corrected acceptance criteria references (criterion 11 + PRD §14, not
+14/15), clarified sort order (type + bundle-relative path), added validation
+finding code scope (`core-index-stale` / `core-index-unmanaged`), and added
+post-apply index refresh integration with page apply. Provisional build-out plan
+called this ADR-010, but that number is now the Phase 4 profile-data schema ADR;
+the index-maintenance ADR takes the next free number, ADR-011. `main` is
 guard-gated and branch-protected (PRs only). See the 2026-07-08 entries in
-[`log.md`](log.md) for the drafting, reviewer substitution, review outcome, and
-governance state.
+[`log.md`](log.md).
 
 **Phase 4 / Academic-research profile closed (issues #53–#59, PRs #61–#67 +
 closeout PR for #60; milestone #4 closes after that PR merges; ADR-010 accepted
@@ -91,43 +107,46 @@ questions **Q2/Q7/Q8 closed** with ADR + log back-references. See
 | [`design/prd-addenda/`](../design/prd-addenda/) | Additive review fixes 001–005 carried into the PRD gate. |
 | [`design/mvp.md`](../design/mvp.md) | MVP statement — scope, principles, success criteria, binding ship gate. |
 | [`design/build-out-plan.md`](../design/build-out-plan.md) | 7-phase plan, criteria→phase map, milestones, issue backlog, ADR-001–012 candidates. |
-| [`design/adr/`](../design/adr/) | ADR index — ADR-001–005 **accepted** (2026-07-01, human-accepted); ADR-006/007/009 **accepted** (2026-07-03, Phase 2 — transaction model, profile system, install ownership; Codex `READY` 5/5), **ADR-008 accepted** (2026-07-03, Phase 3 — provenance & citation model; Codex `READY` 5/5), and **ADR-010 accepted** (2026-07-04, Phase 4 — profile-data schema & rule/citation vocabulary), all under the autonomous-phase mandate and **ratified by Oliver 2026-07-08**; ADR-011/012 candidates still surfaced by the build-out plan. |
+| [`design/adr/`](../design/adr/) | ADR index — ADR-001–005 **accepted** (2026-07-01, human-accepted); ADR-006/007/009 **accepted** (2026-07-03, Phase 2 — transaction model, profile system, install ownership; Codex `READY` 5/5), **ADR-008 accepted** (2026-07-03, Phase 3 — provenance & citation model; Codex `READY` 5/5), **ADR-010 accepted** (2026-07-04, Phase 4 — profile-data schema & rule/citation vocabulary), all under the autonomous-phase mandate and **ratified by Oliver 2026-07-08**; **ADR-011 accepted** (2026-07-08, Phase 5 — deterministic index maintenance; Qwen3.7 Max `READY` 4/5); ADR-012 candidate still surfaced by the build-out plan. |
 
 ## Next action
 
-**ADR-011 (`proposed`); Qwen3.7 Max review returned `READY` (4/5, no blockers)
-and its clarity findings are folded in — next action is Oliver's explicit
-acceptance, before Phase 5 implementation issues I2–I7 open.**
+**Phase 5 issues filed; implementation ready to begin.**
+ADR-011 (`accepted`) provides the architectural foundation; Phase 5
+implementation issues are now filed in milestone #5. The Phase 5 plan
+([phase-5-plan.md](../phase-5-plan.md)) passed adversarial review by Qwen3.7 Max
+(verdict: READY, score 4/5) after incorporating 9 findings: corrected acceptance
+criteria references (criterion 11 + PRD §14, not 14/15), clarified sort order
+(type + bundle-relative path), added validation finding code scope
+(`core-index-stale` / `core-index-unmanaged`), and added post-apply index refresh
+integration with page apply.
+
+Sequencing (two parallel tracks):
+
+**Track 1 — Enrichment (I1):**
+1. [#80](https://github.com/olivermorgan2/llm-wiki-kit/issues/80): enrichment skill adapter (reuses page plan/apply machinery)
+2. [#81](https://github.com/olivermorgan2/llm-wiki-kit/issues/81): enrichment preview fixtures (core + academic-research)
+
+**Track 2 — Index (I2-I7):**
+1. [#82](https://github.com/olivermorgan2/llm-wiki-kit/issues/82): core index generation and fenced-region parsing (Option A)
+2. [#83](https://github.com/olivermorgan2/llm-wiki-kit/issues/83): index CLI command with --dry-run and ADR-006 routing
+3. [#84](https://github.com/olivermorgan2/llm-wiki-kit/issues/84): index stability tests (byte-idempotency, human section preservation)
+4. [#85](https://github.com/olivermorgan2/llm-wiki-kit/issues/85): `core-index-stale` validation finding (ADR-004 framework)
+5. [#86](https://github.com/olivermorgan2/llm-wiki-kit/issues/86): init fence scaffolding (Phase 2 backfill)
+
+Both tracks can proceed in parallel; Track 2 should start with #82 (core index
+generation) as the foundation. Track 1 can begin immediately with #80 (enrichment
+skill adapter).
+
 Phase 4 is the last closed phase. Ratification debt is 0 (Oliver ratified
 ADR-006/007/008/009/010 on 2026-07-08). See the 2026-07-08 entries in
 [`log.md`](log.md) for the ADR-011 drafting, the Codex → Qwen3.7 Max reviewer
 substitution, the Qwen `READY` review outcome, the Phase 5 milestone #5 + issue
 #76 filing, the rollback background, overlay adoption, and ratification.
 
-Sequencing (overlay phase discipline):
-
-1. **Draft ADR-011** (deterministic index maintenance) per issue #76 scope —
-   **done** (`proposed`, branch `docs/adr-011-index-maintenance`; all 9 scope
-   items decided or deferred with rationale).
-2. **Adversarial review — Qwen3.7 Max via OpenRouter** (substituted for Codex) of
-   the ADR-011 draft — **done: `READY`, score 4/5, no blockers**
-   ([artifact](reviews/2026-07-08-qwen-adr-011-review.md)). Three non-blocking
-   clarity findings folded into the draft (bundle-relative path traceability,
-   generated-region format callout, fence-absent append edge case); decision
-   content unchanged, status stays `proposed`. Hermes may run a final Qwen
-   re-review over the clarity edits.
-3. **Accept ADR-011** — **next action** (Qwen `READY` now in hand + Oliver's
-   explicit acceptance; status flips `proposed` → `accepted` in the same PR
-   before merge, keeping ratification debt at 0).
-4. **File Phase 5 implementation issues I2–I7** per
-   [`design/build-out-plan.md`](../design/build-out-plan.md) §Phase 5 once
-   ADR-011 is accepted.
-5. **Milestone #5** (`Phase 5 — Enrichment + index maintenance`, link
-   [#5](https://github.com/olivermorgan2/llm-wiki-kit/milestone/5)) tracks all
-   Phase 5 work.
-
-See issue [#76](https://github.com/olivermorgan2/llm-wiki-kit/issues/76) for the
-full I1 acceptance criteria and ADR scope.
+Milestone #5 (`Phase 5 — Enrichment + index maintenance`, link
+[milestone/5](https://github.com/olivermorgan2/llm-wiki-kit/milestone/5)) tracks
+all Phase 5 work.
 
 Phase 1 issues (all `Foundation`, repo `olivermorgan2/llm-wiki-kit`), closed via
 merged PRs #7–#13:

@@ -960,3 +960,41 @@ re-review over these clarity edits before acceptance.)
   paired `knowledge/index.md` / `design/state.md` edits were authored by the
   Builder session running **Claude Opus 4.8** — an equal-or-higher curator
   substitution, recorded per the overlay.
+
+---
+
+## 2026-07-07 Phase 5 kickoff — all implementation issues filed
+
+Oliver accepted option 1: file all Phase 5 issues and start building.
+
+**ADR-011**: Acceptance criteria flipped in the ADR document (`proposed` → `accepted` on 2026-07-07).
+
+**Issues filed (6 total, milestone #5)**:
+
+Enrichment track (criterion 11):
+- #80: Enrichment skill adapter (I1) — post-apply index refresh included
+- #81: Enrichment preview fixtures (core + academic-research)
+
+Index track (I2-I7):
+- #82: Core index generation and fenced-region parsing (I2)
+- #83: CLI command with --dry-run and ADR-006 routing (I3)
+- #84: Stability, idempotency, cross-platform validation (I4)
+- #85: core-index-stale validation finding (I5)
+- #86: Scaffold wiki/index.md with empty fences (I7, Phase 2 backfill)
+
+**Adversarial review**: Completed and passed before issue filing. Reviewer: Qwen3.7 Max via OpenRouter. Verdict: READY, Score: 4/5, no blocking concerns.
+
+**Phase 5 scope clarified**:
+- Enrichment track: reuses existing page plan/apply machinery, no new ADR needed
+- Index track: implements ADR-011 (deterministic, fenced regions, no model calls)
+- Integration: post-apply index refresh (ADR-011 sub-decision #7)
+- Validation: core-index-stale finding (ADR-004)
+- Backfill: Phase 2 init scaffolds wiki/index.md
+
+**Next**: Start work on #82 (core index generation) as the foundation for the index track. Enrichment track (#80) can proceed in parallel once index foundations are stable.
+
+**Phase 5 acceptance gate**:
+- Criterion 11: enrichment preview-before-apply
+- PRD §14 / FR9: deterministic index maintenance, no model calls, 5000-doc reference corpus
+
+All issues tracked in milestone: https://github.com/olivermorgan2/llm-wiki-kit/milestone/5
