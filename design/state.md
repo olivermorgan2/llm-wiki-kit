@@ -1,9 +1,20 @@
 # Project State
 
-_Last updated: 2026-07-04_
+_Last updated: 2026-07-08_
 
 ## Current status
 
+- **2026-07-08 — governance reset since the Phase 4 closeout.** `main` was rolled
+  back to `051590f` (this Phase 4 closeout) after the direct-to-main Phase 5–7
+  commits were discarded as unbuildable / ADR-violating / carrying fabricated
+  closeout evidence; the hermes-workflow-overlay was adopted (`main` now
+  guard-gated and branch-protected, PRs only); the deferred PR #66/#67 Codex
+  review debt was cleared; and Oliver **ratified ADR-006/007/008/009/010** on
+  2026-07-08, dropping ratification debt to 0. Details in the 2026-07-08 entries
+  of [`../knowledge/log.md`](../knowledge/log.md) (pointer only — not duplicated
+  here). Phase 4 remains the last closed phase; Phase 5 / Enrichment + index
+  maintenance restarts from the build-out plan, beginning with its
+  index-maintenance ADR.
 - **Phase 4 / Academic-research profile: complete.** The `academic-research`
   profile shipped end-to-end per addendum 003 on the ADR-007 profile system:
   the profile-data schema + citation vocabulary ADR-010 (#53), the data-backed
@@ -27,8 +38,8 @@ _Last updated: 2026-07-04_
 - **Phase 3 / Authoring + staged mutation: complete; milestone #3 closed**
   (closeout PR #50). **Phase 2 / Install-init: complete; milestone #2 closed**
   (closeout PR #31). **Phase 1 / Foundation: complete** (ADR-001–005 accepted).
-  Oliver's async ratification of ADR-006/007/008/009 — **and now ADR-010** —
-  remains the one outstanding flag, not a merge blocker.
+  Oliver **ratified** ADR-006/007/008/009 — **and ADR-010** — on 2026-07-08
+  (via the ratification PR closing #74); no ratification debt outstanding.
 
 ## Phase 4 — Academic-research profile — complete
 
@@ -70,8 +81,8 @@ ADR-008's two carry-ins land here.
   → revised in-PR (added the `severities` key per ADR-008 5(d), corrected the
   carry-in-1 wording, sharpened the extends-core semantics, specified the
   field-presence one-finding precedence). Accepted under the 2026-07-03
-  autonomous-phase mandate, **flagged for Oliver's async ratification** alongside
-  ADR-006/007/008/009.
+  autonomous-phase mandate and flagged for Oliver's async ratification alongside
+  ADR-006/007/008/009; **ratified by Oliver 2026-07-08**.
 
 ## Validation evidence (2026-07-04, repo at `main` = `502c717`)
 
@@ -161,7 +172,8 @@ Exit gate (`design/build-out-plan.md` §Phase 4): acceptance criterion **4
 ## Notes / deferrals
 
 - **ADR-010 ratification** — accepted under the 2026-07-03 autonomous-phase
-  mandate, flagged for Oliver's async ratification alongside ADR-006/007/008/009.
+  mandate, flagged for Oliver's async ratification alongside ADR-006/007/008/009;
+  **ratified by Oliver 2026-07-08** (via the ratification PR closing #74).
 - **Codex second-opinion reviews** — Codex reviewed I1–I5 (#53–#57): ADR-010
   (`NEEDS_REVISION` → revised), the loader (`NEEDS_REVISION`: non-mutating deep
   copy + honest inheritance docs), the structural rules (`NEEDS_REVISION`:

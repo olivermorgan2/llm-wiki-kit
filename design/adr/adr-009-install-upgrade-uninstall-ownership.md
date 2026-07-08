@@ -2,6 +2,7 @@
 
 **Status:** accepted
 **Date:** 2026-07-03
+**Ratified:** 2026-07-08 (Oliver, via the ratification PR closing #74)
 
 ## Context
 

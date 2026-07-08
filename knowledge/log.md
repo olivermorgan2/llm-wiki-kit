@@ -789,3 +789,43 @@ quota was exhausted. Both artifacts are archived verbatim:
 **Gate status:** the inherited PR #66/#67 review debt is cleared. No product
 code changed in this debt-clearance PR; the remaining governance blocker
 before filing Phase 5 issues is Oliver's ratification of ADR-006/007/008/009/010.
+
+### 2026-07-08 — Oliver ratifies ADR-006/007/008/009/010; pre-overlay ratification debt cleared
+
+Oliver ratified the five ADRs accepted under the 2026-07-03/04 autonomous-phase
+mandate:
+
+- **ADR-006** (staged mutation / cross-file transaction model) — accepted 2026-07-03
+- **ADR-007** (data-driven profile system, one inheritance level) — accepted 2026-07-03
+- **ADR-008** (provenance & citation model) — accepted 2026-07-03
+- **ADR-009** (install / upgrade / uninstall asset ownership) — accepted 2026-07-03
+- **ADR-010** (declarative profile-data schema + rule/citation vocabulary) — accepted 2026-07-04
+
+**Ratification act:** Oliver's 2026-07-08 session instruction ("let's do the
+ratification") is the intent; his approval of the ratification PR (closes #74)
+is the observable, citable event — no merge SHA is fabricated here, and the PR's
+own annotations say "this PR" pre-merge. Ratification is Oliver's endorsement of
+an acceptance already made, not a new status: each ADR keeps `Status: accepted`
+and gains a `**Ratified:** 2026-07-08` metadata line; ADR-010's in-body
+Ratification note is amended to record the clearance. This is doc/knowledge
+bookkeeping only — no ADR decision content and no product code changed.
+
+**Effect:** ratification debt drops to **0**, satisfying the overlay's
+≤1-phase-of-unratified-ADRs cap; the last governance blocker before Phase 5
+issue filing is cleared. **Next step:** file the Phase 5 (Enrichment + index
+maintenance) backlog per `design/build-out-plan.md` §Phase 5, beginning with the
+index-maintenance ADR at the next free number (per the ADR-010 numbering note).
+
+**Role/model substitution:** the assigned knowledge-layer curator is Claude
+Haiku; this entry (and the paired index/state/open-questions edits) was authored
+by the Builder session running Claude Opus 4.8, which is an equal-or-higher
+capability substitution for the curator role, recorded here per the overlay's
+substitution rule.
+
+**Adversarial review (PR #75):** the ratification PR received the required
+cross-vendor Codex adversarial review on 2026-07-08 — **PASS**, score **5**,
+no blocking or non-blocking findings. Codex confirmed the diff is
+bookkeeping-only (ADR metadata plus consistent state/index/log/open-questions
+clearance of ratification debt to 0), no ADR decision content changed, and no
+fabricated merge SHA. Archived verbatim at
+[`reviews/2026-07-08-codex-pr75-ratification-review.md`](reviews/2026-07-08-codex-pr75-ratification-review.md).
