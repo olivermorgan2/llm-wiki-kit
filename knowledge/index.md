@@ -5,17 +5,17 @@ Front door to the `llm-wiki-kit` knowledge layer. Conventions live in
 
 ## Current phase
 
-**2026-07-08 — main rolled back to `051590f` (the Phase 4 closeout);
-hermes-workflow-overlay adopted; deferred PR #66/#67 Codex review debt cleared.**
-Three unreviewed direct-to-main commits (claiming Phases 5–7) were discarded
-after a post-hoc audit found them unbuildable, ADR-violating, and carrying
-fabricated closeout evidence — see the 2026-07-08 entries in [`log.md`](log.md).
-Phase 4 remains the last closed phase; **Phase 5 / Enrichment + index maintenance
-restarts from the build-out plan**, beginning with its index-maintenance ADR.
-`main` is now guard-gated and branch-protected (PRs only). Oliver ratified
-ADR-006/007/008/009/010 on **2026-07-08** (see [`log.md`](log.md)); with
-ratification debt at 0, Phase 5 issue filing is unblocked, beginning with the
-index-maintenance ADR.
+**2026-07-08 — Phase 5 / Enrichment + index maintenance: milestone #5 and issue #76 filed; ADR-011 drafting next.**
+Phase 4 is the last closed phase. Oliver ratified ADR-006/007/008/009/010 on
+2026-07-08; ratification debt is 0. Phase 5 milestone (**#5**) and the
+issue backlog I1 (**#76**, label `design`, title "Draft + accept ADR-011 —
+deterministic index maintenance") have been filed per `design/build-out-plan.md`
+§Phase 5. **ADR-011 is the gate-blocking prerequisite before Phase 5 implementation
+issues I2–I7 open.** The provisional build-out plan called this ADR-010, but that
+number is now the Phase 4 profile-data schema ADR; the index-maintenance ADR takes
+the next free number, ADR-011. `main` is guard-gated and branch-protected (PRs
+only). See the 2026-07-08 entries in [`log.md`](log.md) for the milestone/issue
+filing and governance state.
 
 **Phase 4 / Academic-research profile closed (issues #53–#59, PRs #61–#67 +
 closeout PR for #60; milestone #4 closes after that PR merges; ADR-010 accepted
@@ -84,27 +84,30 @@ questions **Q2/Q7/Q8 closed** with ADR + log back-references. See
 
 ## Next action
 
-**Phase 4 is the last closed phase; ratification debt is cleared (Oliver
-ratified ADR-006/007/008/009/010 on 2026-07-08). Phase 5 / Enrichment + index
-maintenance restarts from the build-out plan.** `main` was rolled back to
-`051590f` (Phase 4 closeout) after the Phase 5–7 direct-to-main commits were
-discarded; the hermes-workflow-overlay is now in force and `main` is guard-gated
-and branch-protected. See the 2026-07-08 entries in [`log.md`](log.md) for the
-rollback, overlay adoption, PR #66/#67 review-debt clearance, and ratification.
+**Phase 5 issue I1 (#76) filed; next action is to draft, Codex-review, and accept
+ADR-011 (deterministic index maintenance) before Phase 5 implementation issues I2–I7 open.**
+Phase 4 is the last closed phase. Ratification debt is 0 (Oliver ratified
+ADR-006/007/008/009/010 on 2026-07-08). See the 2026-07-08 entries in
+[`log.md`](log.md) for the Phase 5 milestone #5 + issue #76 filing, the rollback
+background, overlay adoption, and ratification.
 
-Next moves, in order:
+Sequencing (overlay phase discipline):
 
-1. **File the Phase 5 backlog** per
-   [`design/build-out-plan.md`](../design/build-out-plan.md) §Phase 5
-   (Enrichment + index maintenance), **beginning with the index-maintenance
-   ADR** at the next free number (per the ADR-010 numbering note). All
-   prerequisite ADRs must be drafted **and accepted** before Phase 5
-   implementation issues open (overlay phase discipline).
-2. **Draft remaining ADR candidates** (011/012) from the "Decisions needing
-   ADRs" list as their phases come up.
+1. **Draft ADR-011** (deterministic index maintenance) per issue #76 scope.
+   All scope items must be covered or explicitly deferred with rationale.
+2. **Codex adversarial review** of ADR-011 draft. Must reach `READY` before
+   acceptance.
+3. **Accept ADR-011** (Oliver accept; if deferred to post-Phase-5-start, recorded
+   under ratification-debt cap per overlay).
+4. **File Phase 5 implementation issues I2–I7** per
+   [`design/build-out-plan.md`](../design/build-out-plan.md) §Phase 5 once
+   ADR-011 is accepted.
+5. **Milestone #5** (`Phase 5 — Enrichment + index maintenance`, link
+   [#5](https://github.com/olivermorgan2/llm-wiki-kit/milestone/5)) tracks all
+   Phase 5 work.
 
-Ratification of ADR-006/007/008/009/010 is **done** (2026-07-08) — no longer a
-governance blocker.
+See issue [#76](https://github.com/olivermorgan2/llm-wiki-kit/issues/76) for the
+full I1 acceptance criteria and ADR scope.
 
 Phase 1 issues (all `Foundation`, repo `olivermorgan2/llm-wiki-kit`), closed via
 merged PRs #7–#13:

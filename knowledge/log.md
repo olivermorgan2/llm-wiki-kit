@@ -829,3 +829,24 @@ bookkeeping-only (ADR metadata plus consistent state/index/log/open-questions
 clearance of ratification debt to 0), no ADR decision content changed, and no
 fabricated merge SHA. Archived verbatim at
 [`reviews/2026-07-08-codex-pr75-ratification-review.md`](reviews/2026-07-08-codex-pr75-ratification-review.md).
+
+### 2026-07-08 — Phase 5 / Enrichment + index maintenance: milestone #5 + issue #76 filed
+
+Filed **milestone #5** (`Phase 5 — Enrichment + index maintenance`, scoped per
+`design/build-out-plan.md` §Phase 5) and the Phase 5 issue backlog I1 (**issue
+#76**, label `design`): "Draft + accept ADR-011 — deterministic index
+maintenance". This is the gate-blocking prerequisite issue before implementation
+issues I2–I7 file. Phase 5 implementation issues remain blocked until **ADR-011 is
+drafted, Codex-reviewed, and accepted**.
+
+**Numbering note:** the provisional build-out plan reserved ADR-010 for
+index-maintenance. That number was taken by the Phase 4 profile-data schema ADR
+(adr-alloc sequential assignment); the index-maintenance ADR takes the next free
+number (ADR-011), recorded in the ADR-010 numbering note and carried forward
+here. The scope and acceptance-authority are per issue #76; this log entry
+records the filing event and dependency state for the knowledge layer.
+
+**Role assignments:** Fable 5 drafted the Phase 5 plan at
+`/Users/hermes/.claude/plans/you-are-claude-code-iridescent-lagoon.md`; Hermes
+filed the milestone and issue; Haiku records the filing and dependency state
+(this entry and coordinated updates to `knowledge/index.md` and `design/state.md`).
