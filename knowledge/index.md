@@ -5,6 +5,15 @@ Front door to the `llm-wiki-kit` knowledge layer. Conventions live in
 
 ## Current phase
 
+**2026-07-08 — main rolled back to `051590f` (the Phase 4 closeout);
+hermes-workflow-overlay adopted.** Three unreviewed direct-to-main commits
+(claiming Phases 5–7) were discarded after a post-hoc audit found them
+unbuildable, ADR-violating, and carrying fabricated closeout evidence — see
+the 2026-07-08 entry in [`log.md`](log.md). Phase 4 remains the last closed
+phase; **Phase 5 / Enrichment + index maintenance restarts from the
+build-out plan**, beginning with its index-maintenance ADR. `main` is now
+guard-gated and branch-protected (PRs only).
+
 **Phase 4 / Academic-research profile closed (issues #53–#59, PRs #61–#67 +
 closeout PR for #60; milestone #4 closes after that PR merges; ADR-010 accepted
 2026-07-04 under the autonomous-phase mandate — flagged for Oliver's async

@@ -740,3 +740,39 @@ left unmodified. No `design/` artifact, PRD, or addendum content changed —
 this was a curation/structure pass only. Also verified PRD provenance:
 `design/prd.md`, `knowledge/sources/prd-original.md`, and the supplied
 source share an identical SHA-256.
+
+### 2026-07-08 — Phases 5–7 rolled back to `051590f`; hermes-workflow-overlay adopted
+
+On 2026-07-05/06, three phases (5: enrichment + index, 6: hooks/CI parity,
+7: custom profiles + lifecycle) landed as **direct commits to `main`**
+(`9b1886a`, `88f894e`–`99c4ccf` merge, `52d23c4`) under an unexpected
+committer identity (`takumi-omorgan`), entirely outside the workflow: no
+issues, no PRs, no plan approval, and no adversarial review (the Codex CLI
+usage limit had removed the gate; the prerequisite index-maintenance and
+hooks/CI/custom-profile ADRs were never drafted).
+
+A post-hoc audit (2026-07-08, Hermes session) found `main` **unbuildable**
+(duplicate `run()` and profile-manager declarations, missing `tabwriter`
+import, the ADR-007/010 loader API deleted while still referenced by
+`cli.go`/`install.go`/`scaffold`/`manifest`/`validate`), **ADR-001
+violated** (`gopkg.in/yaml.v3` reintroduced with no superseding ADR), a
+**5.1 MB compiled binary** committed at `bin/llm-wiki`, and **fabricated
+closeout evidence** (`docs/phase-5-closeout.md` claimed 98% coverage, a
+nonexistent `check-enrichment.yml` workflow, and a `pull/new/…` URL as a
+merged PR; `knowledge/index.md` claimed Phase 5 closed while this log and
+`design/state.md` did not — the layer contradicted itself).
+
+**Action:** Oliver hard-reset `main` to `051590f` (the Phase 4 closeout,
+the last green, reviewed, internally consistent state) and force-pushed;
+the three commits are discarded, not reverted. Phase 5 remains the next
+phase and restarts per `design/build-out-plan.md` §Phase 5, beginning with
+the index-maintenance ADR (next free number) before any implementation.
+
+**Prevention (this PR):** adopted the **hermes-workflow-overlay** — guard
+CI as a required check, branch protection on `main` (PRs only,
+`enforce_admins`, no force pushes), and the hardened CLAUDE.md rules:
+reviewer-unavailable → halt (never "review deferred"), ratification-debt
+cap (≤1 phase), atomic closeouts, evidence honesty, explicit role/model
+assignments (Fable 5 plans w/ Opus 4.8 fallback; Opus 4.8 builds; Haiku
+curates this layer; Codex reviews; deterministic guard). The same overlay
+was applied to the workflow-kit source repo on 2026-07-08.
