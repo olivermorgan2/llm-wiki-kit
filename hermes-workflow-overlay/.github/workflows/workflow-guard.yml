@@ -1,0 +1,78 @@
+name: guard
+
+# Process-invariant checks for the Hermes hardened workflow.
+# Add this job name ("guard") to the branch-protection required checks.
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: PR closes an issue
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s' "$BODY" | grep -qiE '\bclose[sd]? #[0-9]+' \
+            || { echo "::error::PR body must contain 'Closes #N'"; exit 1; }
+
+      - name: Compute changed files
+        id: diff
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          git diff --name-only --diff-filter=ACMR \
+            "origin/${{ github.base_ref }}"...HEAD > /tmp/changed.txt
+          cat /tmp/changed.txt
+
+      - name: No binaries or large files
+        run: |
+          fail=0
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            case "$f" in bin/*) echo "::error::$f: committed under bin/"; fail=1 ;; esac
+            if [ "$(stat -c%s "$f")" -gt 1048576 ]; then
+              echo "::error::$f exceeds 1 MiB"; fail=1
+            fi
+            if file -b "$f" | grep -qE 'ELF|Mach-O|PE32'; then
+              echo "::error::$f is a compiled binary"; fail=1
+            fi
+          done < /tmp/changed.txt
+          exit $fail
+
+      - name: ADR changes carry an adversarial-review receipt
+        run: |
+          if grep -qE '^design/adr/adr-' /tmp/changed.txt; then
+            grep -qE '^knowledge/reviews/' /tmp/changed.txt || {
+              echo "::error::ADR added/modified but no knowledge/reviews/ artifact in this PR (adversarial review receipt required)"
+              exit 1
+            }
+          fi
+
+      - name: Knowledge layer moves together
+        run: |
+          # index.md claims phase state; log.md is the record. They change together.
+          if grep -qx 'knowledge/index.md' /tmp/changed.txt; then
+            grep -qx 'knowledge/log.md' /tmp/changed.txt || {
+              echo "::error::knowledge/index.md changed without knowledge/log.md — closeouts are atomic"
+              exit 1
+            }
+          fi
+
+      - name: No placeholders introduced in design/ or knowledge/
+        run: |
+          # Scan only ADDED lines — historical entries may legitimately
+          # quote placeholder tokens when describing validation runs.
+          added=$(git diff "origin/${{ github.base_ref }}"...HEAD -- design knowledge \
+            | grep -E '^\+' | grep -v '^\+\+\+' \
+            | grep -E '\{\{|\}\}|_TBD_|<!-- FILL' || true)
+          if [ -n "$added" ]; then
+            echo "::error::template placeholders introduced in design/ or knowledge/:"
+            printf '%s\n' "$added"
+            exit 1
+          fi

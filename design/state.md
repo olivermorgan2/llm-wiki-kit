@@ -4,30 +4,47 @@ _Last updated: 2026-07-08_
 
 ## Current status
 
-- **2026-07-08 — Phase 5 / Enrichment + index maintenance: ADR-011 (`proposed`) — Qwen3.7 Max review `READY` (4/5, no blockers); next action is Oliver acceptance.**
+- **2026-07-08 — Phase 5 / Enrichment + index maintenance: issues filed, ready to build.**
   Phase 4 is the last closed phase; ratification debt is 0 (Oliver ratified
-  ADR-006/007/008/009/010 on 2026-07-08). Phase 5 **milestone #5** and gate-blocking
-  issue **#76** (`design: Draft + accept ADR-011 — deterministic index maintenance`)
-  are filed; **[ADR-011](adr/adr-011-deterministic-index-maintenance.md) is drafted
-  `proposed`** on branch `docs/adr-011-index-maintenance` (Option A — fenced
-  generated regions in the OKF-reserved `index.md`, standalone ADR-006 staged write,
-  `core-index-stale` warning; all 9 issue-#76 scope items decided or deferred with
-  rationale). The **adversarial review — Qwen3.7 Max via OpenRouter**
-  (`qwen/qwen3.7-max`, substituted for OpenAI Codex; overlay-legal, recorded on issue
-  #76 and in the log) has now **run and returned `READY`, score 4/5, no blocking
-  findings** ([artifact](../knowledge/reviews/2026-07-08-qwen-adr-011-review.md)); its
-  three non-blocking clarity findings (bundle-relative path traceability,
-  generated-region format callout, fence-absent append edge case) are **folded into
-  the draft** with decision content unchanged and status still `proposed`. Next action
-  is therefore **Oliver's explicit acceptance** of ADR-011, **not** implementation;
-  ADR-011 remains the prerequisite before Phase 5 implementation issues I2–I7 open,
-  unblocking only on that acceptance + merge. (Hermes may run a final Qwen re-review
-  over the clarity edits before acceptance.) The provisional build-out plan reserved
-  ADR-010 for index maintenance, but ADR-010 is now the Phase 4 profile-data schema
-  ADR; the index-maintenance ADR takes the next free number, ADR-011. Details in the
-  2026-07-08 entries of [`../knowledge/log.md`](../knowledge/log.md). `main` was
-  previously rolled back to `051590f` (Phase 4 closeout) and the hermes-workflow-overlay
-  was adopted (`main` now guard-gated and branch-protected, PRs only).
+  ADR-006/007/008/009/010 on 2026-07-08). Phase 5 **milestone #5** is active;
+  **ADR-011 (deterministic index maintenance) is `accepted`** (Option A — fenced
+  generated regions in the OKF-reserved `index.md`, standalone ADR-006 staged
+  write, `core-index-stale` warning). The **adversarial review — Qwen3.7 Max via
+  OpenRouter** (`qwen/qwen3.7-max`, substituted for OpenAI Codex; overlay-legal,
+  recorded on issue #76 and in the log) returned `READY`, score 4/5, no blocking
+  findings ([artifact](../knowledge/reviews/2026-07-08-qwen-adr-011-review.md));
+  its three non-blocking clarity findings (bundle-relative path traceability,
+  generated-region format callout, fence-absent append edge case) were **folded
+  into the draft before acceptance** with decision content unchanged. Oliver
+  **explicitly accepted ADR-011** on 2026-07-08, flipping status `proposed` →
+  `accepted` in branch `docs/adr-011-index-maintenance` before merge, keeping
+  ratification debt at 0.
+
+  **Phase 5 implementation issues are now filed** (milestone #5):
+  enrichment track (I1):
+  - #80: enrichment skill adapter (reuses page plan/apply machinery)
+  - #81: enrichment preview fixtures (core + academic-research)
+  
+  index track (I2-I7):
+  - #82: core index generation and fenced-region parsing (Option A)
+  - #83: index CLI command with --dry-run and ADR-006 routing
+  - #84: index stability tests (byte-idempotency, human section preservation)
+  - #85: `core-index-stale` validation finding (ADR-004 framework)
+  - #86: init fence scaffolding (Phase 2 backfill)
+  
+  **Phase 5 plan** (phase-5-plan.md) passed adversarial review by Qwen3.7 Max
+  (verdict: READY, score 4/5) after incorporating 9 findings: corrected
+  acceptance criteria references (criterion 11 + PRD §14/FR9, not 14/15),
+  clarified sort order (type + bundle-relative path), added validation finding
+  code scope (`core-index-stale` / `core-index-unmanaged`), and added post-apply
+  index refresh integration with page apply. **Next action: start work on I1
+  (#80) and I2 (#82) in parallel tracks.** Provisional build-out plan reserved
+  ADR-010 for index maintenance, but ADR-010 is now the Phase 4 profile-data
+  schema ADR; the index-maintenance ADR takes the next free number, ADR-011.
+  Details in the 2026-07-08 entries of
+  [`../knowledge/log.md`](../knowledge/log.md). `main` was previously rolled back
+  to `051590f` (Phase 4 closeout) and the hermes-workflow-overlay was adopted
+  (`main` now guard-gated and branch-protected, PRs only).
 - **Phase 4 / Academic-research profile: complete.** The `academic-research`
   profile shipped end-to-end per addendum 003 on the ADR-007 profile system:
   the profile-data schema + citation vocabulary ADR-010 (#53), the data-backed

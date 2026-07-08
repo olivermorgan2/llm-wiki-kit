@@ -1,7 +1,9 @@
 # ADR-011: Deterministic index maintenance (fenced generated regions, staged writes)
 
-**Status:** proposed
+**Status:** accepted
 **Date:** 2026-07-08
+**Accepted:** 2026-07-08
+**Accepted by:** Oliver (owner)
 
 ## Context
 
