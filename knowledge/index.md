@@ -68,7 +68,7 @@ questions **Q2/Q7/Q8 closed** with ADR + log back-references. See
 | [`risks.md`](risks.md) | Live risk register (product, cross-cutting, process, review). |
 | [`open-questions.md`](open-questions.md) | Q1–Q8 + bootstrap questions, with status. |
 | [`log.md`](log.md) | Chronological decision & review log. |
-| [`reviews/`](reviews/) | Verbatim review archives — [`2026-06-30-codex-prd-review.md`](reviews/2026-06-30-codex-prd-review.md), [`2026-07-01-codex-adr-001-005-review.md`](reviews/2026-07-01-codex-adr-001-005-review.md), [`2026-07-01-codex-adr-001-005-rereview.md`](reviews/2026-07-01-codex-adr-001-005-rereview.md), [`2026-07-08-codex-pr66-retro-review.md`](reviews/2026-07-08-codex-pr66-retro-review.md), [`2026-07-08-codex-pr67-retro-review.md`](reviews/2026-07-08-codex-pr67-retro-review.md). |
+| [`reviews/`](reviews/) | Verbatim review archives — [`2026-06-30-codex-prd-review.md`](reviews/2026-06-30-codex-prd-review.md), [`2026-07-01-codex-adr-001-005-review.md`](reviews/2026-07-01-codex-adr-001-005-review.md), [`2026-07-01-codex-adr-001-005-rereview.md`](reviews/2026-07-01-codex-adr-001-005-rereview.md), [`2026-07-08-codex-pr66-retro-review.md`](reviews/2026-07-08-codex-pr66-retro-review.md), [`2026-07-08-codex-pr67-retro-review.md`](reviews/2026-07-08-codex-pr67-retro-review.md), [`2026-07-08-codex-pr75-ratification-review.md`](reviews/2026-07-08-codex-pr75-ratification-review.md). |
 | [`sources/`](sources/) | Verbatim sources — [`prd-original.md`](sources/prd-original.md). |
 
 ## Pointers into `design/` (authoritative, tool-maintained)

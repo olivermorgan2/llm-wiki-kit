@@ -821,3 +821,11 @@ Haiku; this entry (and the paired index/state/open-questions edits) was authored
 by the Builder session running Claude Opus 4.8, which is an equal-or-higher
 capability substitution for the curator role, recorded here per the overlay's
 substitution rule.
+
+**Adversarial review (PR #75):** the ratification PR received the required
+cross-vendor Codex adversarial review on 2026-07-08 — **PASS**, score **5**,
+no blocking or non-blocking findings. Codex confirmed the diff is
+bookkeeping-only (ADR metadata plus consistent state/index/log/open-questions
+clearance of ratification debt to 0), no ADR decision content changed, and no
+fabricated merge SHA. Archived verbatim at
+[`reviews/2026-07-08-codex-pr75-ratification-review.md`](reviews/2026-07-08-codex-pr75-ratification-review.md).
