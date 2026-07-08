@@ -2,6 +2,7 @@
 
 **Status:** accepted
 **Date:** 2026-07-04
+**Ratified:** 2026-07-08 (Oliver, via the ratification PR closing #74)
 
 ## Context
 
@@ -373,5 +374,6 @@ codes profile-agnostic; the divergence is recorded in `knowledge/log.md`.
   maintenance** (Phase 5); `adr-alloc` assigned the next free number to *this*
   schema decision, so the index-maintenance ADR renumbers to the next free number
   when Phase 5 lands. **Ratification:** accepted under the 2026-07-03
-  autonomous-phase mandate and **flagged for Oliver's async ratification**
-  alongside ADR-006/007/008/009.
+  autonomous-phase mandate and flagged for Oliver's async ratification alongside
+  ADR-006/007/008/009; **ratified by Oliver 2026-07-08** (via the ratification PR
+  closing #74), clearing the flag.

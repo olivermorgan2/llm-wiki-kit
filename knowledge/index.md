@@ -12,14 +12,15 @@ after a post-hoc audit found them unbuildable, ADR-violating, and carrying
 fabricated closeout evidence — see the 2026-07-08 entries in [`log.md`](log.md).
 Phase 4 remains the last closed phase; **Phase 5 / Enrichment + index maintenance
 restarts from the build-out plan**, beginning with its index-maintenance ADR.
-`main` is now guard-gated and branch-protected (PRs only). The remaining
-governance blocker before filing Phase 5 issues is Oliver's ratification of
-ADR-006/007/008/009/010.
+`main` is now guard-gated and branch-protected (PRs only). Oliver ratified
+ADR-006/007/008/009/010 on **2026-07-08** (see [`log.md`](log.md)); with
+ratification debt at 0, Phase 5 issue filing is unblocked, beginning with the
+index-maintenance ADR.
 
 **Phase 4 / Academic-research profile closed (issues #53–#59, PRs #61–#67 +
 closeout PR for #60; milestone #4 closes after that PR merges; ADR-010 accepted
 2026-07-04 under the autonomous-phase mandate — flagged for Oliver's async
-ratification).** The `academic-research` profile shipped end-to-end: the ADR-010
+ratification; ratified by Oliver 2026-07-08).** The `academic-research` profile shipped end-to-end: the ADR-010
 profile-data schema + citation vocabulary (#53), the data-backed loader with
 one-level `extends: core` (#54), type-conditional structural rules (#55),
 citation obligations landing ADR-008's two carry-ins (#56), the full profile +
@@ -42,7 +43,8 @@ plan-time citation-loss approval gate, the authoring skill adapter, and the Phas
 **Phase 1 / Foundation closed (issues #1–#6, PRs #7–#13, ADR-001–005 accepted).
 Phase 2 / Install-init closed (issues #14–#21, PRs #22–#28 + closeout PR #31;
 milestone #2 closed 2026-07-03; ADR-006/007/009 accepted 2026-07-03 under the
-autonomous-phase mandate — flagged for Oliver's async ratification).**
+autonomous-phase mandate — flagged for Oliver's async ratification; ratified by
+Oliver 2026-07-08).**
 Bootstrapped 2026-06-30 from `claude-workflow-kit` v5.0.1.
 Source PRD normalized; adversarial Codex review (`NEEDS_REVISION`) landed as PRD
 addenda 001–005; `/prd-to-mvp` produced [`design/mvp.md`](../design/mvp.md) and
@@ -78,35 +80,31 @@ questions **Q2/Q7/Q8 closed** with ADR + log back-references. See
 | [`design/prd-addenda/`](../design/prd-addenda/) | Additive review fixes 001–005 carried into the PRD gate. |
 | [`design/mvp.md`](../design/mvp.md) | MVP statement — scope, principles, success criteria, binding ship gate. |
 | [`design/build-out-plan.md`](../design/build-out-plan.md) | 7-phase plan, criteria→phase map, milestones, issue backlog, ADR-001–012 candidates. |
-| [`design/adr/`](../design/adr/) | ADR index — ADR-001–005 **accepted** (2026-07-01); ADR-006/007/009 **accepted** (2026-07-03, Phase 2 — transaction model, profile system, install ownership; Codex `READY` 5/5, under the autonomous-phase mandate pending Oliver's async ratification); **ADR-008 accepted** (2026-07-03, Phase 3 — provenance & citation model; Codex `READY` 5/5, same mandate/flag); ADR-010/011/012 candidates still surfaced by the build-out plan. |
+| [`design/adr/`](../design/adr/) | ADR index — ADR-001–005 **accepted** (2026-07-01, human-accepted); ADR-006/007/009 **accepted** (2026-07-03, Phase 2 — transaction model, profile system, install ownership; Codex `READY` 5/5), **ADR-008 accepted** (2026-07-03, Phase 3 — provenance & citation model; Codex `READY` 5/5), and **ADR-010 accepted** (2026-07-04, Phase 4 — profile-data schema & rule/citation vocabulary), all under the autonomous-phase mandate and **ratified by Oliver 2026-07-08**; ADR-011/012 candidates still surfaced by the build-out plan. |
 
 ## Next action
 
-**Phase 3 / Authoring + staged mutation closed out 2026-07-04 (issues
-#32/#34–#42, PRs #33/#43–#49 + closeout PR for #40).** The evidence artifact is
-[`../design/state.md`](../design/state.md) (merged issue/PR ledger, five-category
-validation evidence, exit-criteria verdict for criteria 6/9/10/11/12/13). Two
-caveats carry forward: windows-amd64 full-suite RED (follow-up **#29**) and
-macos-amd64 no CI evidence (follow-up **#30**); the Phase 3 gate is **observed
-on 4/5** platforms (Windows via the named acceptance step), closed on inference
-for macos-amd64. Once the #40 closeout PR merges, milestone #3 drops to zero
-open issues and is closed manually with the #29/#30 caveat notes (**not** closed
-before merge — #40 would otherwise sit open inside a closed milestone). Issue
-#41 is a closed duplicate of #40.
+**Phase 4 is the last closed phase; ratification debt is cleared (Oliver
+ratified ADR-006/007/008/009/010 on 2026-07-08). Phase 5 / Enrichment + index
+maintenance restarts from the build-out plan.** `main` was rolled back to
+`051590f` (Phase 4 closeout) after the Phase 5–7 direct-to-main commits were
+discarded; the hermes-workflow-overlay is now in force and `main` is guard-gated
+and branch-protected. See the 2026-07-08 entries in [`log.md`](log.md) for the
+rollback, overlay adoption, PR #66/#67 review-debt clearance, and ratification.
 
 Next moves, in order:
 
-1. **File Phase 4 issues** — the academic-research profile per
-   [`design/build-out-plan.md`](../design/build-out-plan.md) §Phase 4 (ADR-007
-   profile-system boundary, already accepted). Carry forward ADR-008's two Codex
-   non-blocking carry-ins as Phase 4 profile-vocabulary work: gate the repo-path
-   resolution class on `isIntraWiki`, and define whether a present-but-unresolved
-   citation satisfies a require-citation obligation. Enrichment (Phase 5) and
-   cross-surface parity (Phase 6) remain later.
-2. **Oliver async-ratifies ADR-006/007/008/009** — all accepted under the
-   2026-07-03 mandate, still flagged (not a blocker).
-3. **Draft remaining ADR candidates** (010/011/012) from the "Decisions needing
+1. **File the Phase 5 backlog** per
+   [`design/build-out-plan.md`](../design/build-out-plan.md) §Phase 5
+   (Enrichment + index maintenance), **beginning with the index-maintenance
+   ADR** at the next free number (per the ADR-010 numbering note). All
+   prerequisite ADRs must be drafted **and accepted** before Phase 5
+   implementation issues open (overlay phase discipline).
+2. **Draft remaining ADR candidates** (011/012) from the "Decisions needing
    ADRs" list as their phases come up.
+
+Ratification of ADR-006/007/008/009/010 is **done** (2026-07-08) — no longer a
+governance blocker.
 
 Phase 1 issues (all `Foundation`, repo `olivermorgan2/llm-wiki-kit`), closed via
 merged PRs #7–#13:
