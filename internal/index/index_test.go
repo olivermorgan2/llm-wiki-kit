@@ -1,6 +1,8 @@
 package index
 
 import (
+	"bytes"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -229,5 +231,159 @@ func TestParsePageMetadataSubdirStemFallback(t *testing.T) {
 	}
 	if got.Title != "deep-note" {
 		t.Errorf("Title = %q, want basename stem %q", got.Title, "deep-note")
+	}
+}
+
+// --- ExtractFencedRegion / Reconstruct (ADR-011 sub-decision 3) ----------------
+
+func TestExtractFencedRegionHappyPath(t *testing.T) {
+	content := []byte("# My Wiki\n\nHuman preamble.\n" +
+		FenceStart + "\n" +
+		"## claim\n- [x](x.md)\n" +
+		FenceEnd + "\ntrailer text\n")
+
+	before, fenced, after, err := ExtractFencedRegion(content)
+	if err != nil {
+		t.Fatalf("ExtractFencedRegion returned error: %v", err)
+	}
+	if got, want := string(fenced), "## claim\n- [x](x.md)\n"; got != want {
+		t.Errorf("fenced = %q, want %q", got, want)
+	}
+	if !bytes.HasSuffix(before, []byte(FenceStart+"\n")) {
+		t.Errorf("before must end with the start marker line + newline, got %q", before)
+	}
+	if !bytes.HasPrefix(after, []byte(FenceEnd)) {
+		t.Errorf("after must begin with the end marker, got %q", after)
+	}
+	if got := Reconstruct(before, fenced, after); !bytes.Equal(got, content) {
+		t.Errorf("round-trip mismatch:\n got=%q\nwant=%q", got, content)
+	}
+}
+
+func TestExtractFencedRegionNoFence(t *testing.T) {
+	content := []byte("# Just a doc\n\nno markers here\n")
+	_, _, _, err := ExtractFencedRegion(content)
+	if !errors.Is(err, ErrNoFence) {
+		t.Fatalf("err = %v, want ErrNoFence", err)
+	}
+}
+
+func TestExtractFencedRegionMalformed(t *testing.T) {
+	cases := []struct {
+		name    string
+		content string
+	}{
+		{"two starts", FenceStart + "\n" + FenceStart + "\n" + FenceEnd + "\n"},
+		{"two ends", FenceStart + "\n" + FenceEnd + "\n" + FenceEnd + "\n"},
+		{"nested start,start,end,end", FenceStart + "\ninner\n" + FenceStart + "\n" + FenceEnd + "\n" + FenceEnd + "\n"},
+		{"unterminated start no end", "preamble\n" + FenceStart + "\nbody\n"},
+		{"orphan end no start", "preamble\n" + FenceEnd + "\ntrailer\n"},
+		{"end before start", FenceEnd + "\nmiddle\n" + FenceStart + "\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, _, err := ExtractFencedRegion([]byte(tc.content))
+			if !errors.Is(err, ErrMalformedFence) {
+				t.Fatalf("err = %v, want ErrMalformedFence", err)
+			}
+		})
+	}
+}
+
+func TestExtractFencedRegionCRLFMarkers(t *testing.T) {
+	// Markers on CRLF lines are still detected; Reconstruct preserves the exact
+	// bytes (including the CR) so the round trip is lossless.
+	content := []byte("preamble\r\n" + FenceStart + "\r\ninner\r\n" + FenceEnd + "\r\ntrailer\r\n")
+	before, fenced, after, err := ExtractFencedRegion(content)
+	if err != nil {
+		t.Fatalf("ExtractFencedRegion returned error on CRLF markers: %v", err)
+	}
+	if got := Reconstruct(before, fenced, after); !bytes.Equal(got, content) {
+		t.Errorf("CRLF round-trip mismatch:\n got=%q\nwant=%q", got, content)
+	}
+}
+
+func TestExtractFencedRegionPreservesHumanContent(t *testing.T) {
+	// Preamble and trailer bytes survive extract → reconstruct untouched.
+	content := []byte("# Title\n\n> a blockquote\n\n" +
+		FenceStart + "\nold body\n" + FenceEnd + "\n\n## Appendix\nkeep me\n")
+	before, fenced, after, err := ExtractFencedRegion(content)
+	if err != nil {
+		t.Fatalf("ExtractFencedRegion returned error: %v", err)
+	}
+	if !bytes.Contains(before, []byte("> a blockquote")) {
+		t.Errorf("preamble content lost from before: %q", before)
+	}
+	if !bytes.Contains(after, []byte("## Appendix\nkeep me")) {
+		t.Errorf("trailer content lost from after: %q", after)
+	}
+	if got := Reconstruct(before, fenced, after); !bytes.Equal(got, content) {
+		t.Errorf("round-trip mismatch:\n got=%q\nwant=%q", got, content)
+	}
+}
+
+func TestReconstructWithFreshBodyNonEmpty(t *testing.T) {
+	content := []byte("preamble\n" + FenceStart + "\nstale\n" + FenceEnd + "\ntrailer\n")
+	before, _, after, err := ExtractFencedRegion(content)
+	if err != nil {
+		t.Fatalf("ExtractFencedRegion returned error: %v", err)
+	}
+	body := GenerateIndex(goldenPages())
+	rebuilt := Reconstruct(before, []byte(body), after)
+
+	// The refreshed region reads back byte-identically, and doing it twice is a
+	// fixed point (byte-idempotency across the whole file).
+	before2, fenced2, after2, err := ExtractFencedRegion(rebuilt)
+	if err != nil {
+		t.Fatalf("re-extract returned error: %v", err)
+	}
+	if string(fenced2) != body {
+		t.Errorf("refreshed region = %q, want %q", fenced2, body)
+	}
+	if got := Reconstruct(before2, []byte(GenerateIndex(goldenPages())), after2); !bytes.Equal(got, rebuilt) {
+		t.Errorf("reconstruct not idempotent:\n first=%q\nsecond=%q", rebuilt, got)
+	}
+}
+
+func TestReconstructWithFreshBodyEmpty(t *testing.T) {
+	// Empty pages → empty body → the end marker sits immediately after the start
+	// marker's newline (ADR-011 edge case).
+	content := []byte("preamble\n" + FenceStart + "\nstale content\n" + FenceEnd + "\ntrailer\n")
+	before, _, after, err := ExtractFencedRegion(content)
+	if err != nil {
+		t.Fatalf("ExtractFencedRegion returned error: %v", err)
+	}
+	rebuilt := Reconstruct(before, []byte(GenerateIndex(nil)), after)
+	want := "preamble\n" + FenceStart + "\n" + FenceEnd + "\ntrailer\n"
+	if string(rebuilt) != want {
+		t.Errorf("empty-body reconstruct:\n got=%q\nwant=%q", rebuilt, want)
+	}
+	// And it re-extracts with an empty inner region.
+	_, fenced2, _, err := ExtractFencedRegion(rebuilt)
+	if err != nil {
+		t.Fatalf("re-extract returned error: %v", err)
+	}
+	if len(fenced2) != 0 {
+		t.Errorf("re-extracted inner region = %q, want empty", fenced2)
+	}
+}
+
+func TestStalenessInvariant(t *testing.T) {
+	// Documents the comparison #83/#85 rely on: bytes.Equal(fenced, GenerateIndex)
+	// is true when the region is current and false once a page changes.
+	body := GenerateIndex(goldenPages())
+	content := []byte("preamble\n" + FenceStart + "\n" + body + FenceEnd + "\ntrailer\n")
+
+	_, fenced, _, err := ExtractFencedRegion(content)
+	if err != nil {
+		t.Fatalf("ExtractFencedRegion returned error: %v", err)
+	}
+	if !bytes.Equal(fenced, []byte(GenerateIndex(goldenPages()))) {
+		t.Errorf("current region reported stale:\nfenced=%q\n regen=%q", fenced, body)
+	}
+
+	changed := append(goldenPages(), PageMetadata{Type: "claim", Title: "New", Path: "claims/claim-003.md"})
+	if bytes.Equal(fenced, []byte(GenerateIndex(changed))) {
+		t.Error("region reported current after a page was added, want stale")
 	}
 }
