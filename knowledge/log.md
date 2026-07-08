@@ -850,3 +850,58 @@ records the filing event and dependency state for the knowledge layer.
 `/Users/hermes/.claude/plans/you-are-claude-code-iridescent-lagoon.md`; Hermes
 filed the milestone and issue; Haiku records the filing and dependency state
 (this entry and coordinated updates to `knowledge/index.md` and `design/state.md`).
+
+### 2026-07-08 — ADR-011 drafted (`proposed`); adversarial reviewer Codex → Qwen3.7 Max (OpenRouter)
+
+Drafted **[ADR-011](../design/adr/adr-011-deterministic-index-maintenance.md)**
+— deterministic index maintenance (Phase 5 issue **#76**) — on branch
+`docs/adr-011-index-maintenance`. Status is **`proposed`**; **no acceptance is
+claimed and no review has yet run.** Decision (**Option A**): the engine
+maintains exactly one generated index — the OKF-reserved bundle-root `index.md`
+— writing only the bytes inside an HTML-comment fence pair
+(`<!-- llm-wiki:index:start/end -->`, the repo's own `adr-index` idiom), with
+per-type sections inside the region; entries derive solely from already-parsed
+frontmatter (`type`/`title`/`description`) + bundle-relative path via the ADR-001
+`yamladapter` (title→filename-stem fallback, description omitted if absent,
+parse-failing pages excluded); one entry per path (duplicates structurally
+impossible); sort key `type` then path, bytewise, titles never sort keys;
+byte-idempotent with LF-only generated region; new engine finding
+`core-index-stale` (+ `core-index-unmanaged`), `ruleset: profile`, **warning**
+default per FR8/ADR-004, promotable via ADR-010's `severities` map; `--dry-run`
+non-mutating diff; `--json` uses the ADR-003 v1 envelope unchanged except one new
+`operation` value; the write is a **standalone** ADR-006 staged transaction
+(rejecting the fold-into-every-page-plan alternative, Option C, on base-hash
+contention); no model calls, new `internal/index` package, **no new dependency**.
+Rejected: Option B (fully engine-owned file — violates FR9 human-section
+preservation), Option C (per-plan coupling), and model-assisted curation
+(FR9/§14).
+
+- **Numbering correction (issue #76 AC):** provisional build-out-plan "ADR-010 —
+  index maintenance" is this ADR, renumbered to **ADR-011** by `adr-alloc` after
+  the number went to the Phase-4 schema ADR; the ADR reconciles ADR-004's
+  "interlock with ADR-010" reference to ADR-011 (ADR-004 not edited in place).
+- **Reviewer substitution (overlay-recorded):** the adversarial reviewer for
+  ADR-011 is **Qwen3.7 Max via OpenRouter**, substituted for OpenAI Codex.
+  Permitted under the overlay: non-Anthropic, cross-vendor, context-independent
+  from the author. Oliver approved the substitution and Hermes recorded it on
+  issue #76. The review has **not** been run in this session; Hermes runs it
+  after this draft. Verdict vocabulary `READY` / `NEEDS_REVISION`; iterate to
+  `READY`; the verbatim artifact will be archived under `knowledge/reviews/`
+  (`YYYY-MM-DD-qwen-adr-011-review.md`) by Hermes. Reviewer unavailable at review
+  time → **halt and report to Oliver** (overlay hard gate; no "review deferred").
+- **Acceptance pending:** status flips `proposed` → `accepted` only after Qwen
+  `READY` **and** Oliver's explicit acceptance, in the same PR, before merge —
+  the ADR-001–005 pattern; keeps ratification debt at 0. Phase 5 implementation
+  issues I2–I7 stay blocked until then. **Live next action is the Qwen review,
+  not implementation.**
+- **Validation (this draft):** `check-plan --criteria-set adr --non-interactive`
+  deterministic **ADR-C1–C4 PASS** (C5 expected forward-ref WARN for the future
+  ADR-012; C6 standing deferred WARN); `sync-adr-index --check` in sync (README
+  regenerated to 11 rows); `git diff --check` clean; placeholder scan clean;
+  `GOTOOLCHAIN=local go test ./...` green (docs-only change). No product/source
+  code written; no accepted ADR edited in place; not pushed / no PR.
+- **Role/model substitution:** the assigned knowledge-layer curator is Claude
+  Haiku; this entry and the paired `knowledge/index.md` / `design/state.md`
+  next-action edits were authored by the Builder session running **Claude Opus
+  4.8** — an equal-or-higher curator substitution, recorded here per the overlay,
+  matching the 2026-07-08 ratification-entry precedent.

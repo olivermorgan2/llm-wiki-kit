@@ -4,17 +4,24 @@ _Last updated: 2026-07-08_
 
 ## Current status
 
-- **2026-07-08 — Phase 5 / Enrichment + index maintenance: milestone #5 and issue #76 filed.** Phase 4 is
-  the last closed phase; ratification debt is 0 (Oliver ratified
-  ADR-006/007/008/009/010 on 2026-07-08). Phase 5 **milestone #5** and the gate-blocking
+- **2026-07-08 — Phase 5 / Enrichment + index maintenance: ADR-011 drafted (`proposed`); Qwen3.7 Max adversarial review next.**
+  Phase 4 is the last closed phase; ratification debt is 0 (Oliver ratified
+  ADR-006/007/008/009/010 on 2026-07-08). Phase 5 **milestone #5** and gate-blocking
   issue **#76** (`design: Draft + accept ADR-011 — deterministic index maintenance`)
-  have been filed per the build-out plan. ADR-011 is the prerequisite before Phase 5
-  implementation issues I2–I7 open. The provisional build-out plan reserved ADR-010
-  for index maintenance, but ADR-010 is now the Phase 4 profile-data schema ADR; the
-  index-maintenance ADR takes the next free number, ADR-011. Details in the 2026-07-08
-  entries of [`../knowledge/log.md`](../knowledge/log.md). `main` was previously rolled
-  back to `051590f` (Phase 4 closeout) and the hermes-workflow-overlay was adopted
-  (`main` now guard-gated and branch-protected, PRs only).
+  are filed; **[ADR-011](adr/adr-011-deterministic-index-maintenance.md) is now
+  drafted as `proposed`** on branch `docs/adr-011-index-maintenance` (Option A —
+  fenced generated regions in the OKF-reserved `index.md`, standalone ADR-006 staged
+  write, `core-index-stale` warning; all 9 issue-#76 scope items decided or deferred
+  with rationale). **No review has run and no acceptance is claimed.** Next action is
+  the **adversarial review — Qwen3.7 Max via OpenRouter** (substituted for OpenAI
+  Codex; overlay-legal, recorded on issue #76 and in the log), **not** implementation;
+  ADR-011 remains the prerequisite before Phase 5 implementation issues I2–I7 open,
+  unblocking only on Qwen `READY` + Oliver acceptance. The provisional build-out plan
+  reserved ADR-010 for index maintenance, but ADR-010 is now the Phase 4 profile-data
+  schema ADR; the index-maintenance ADR takes the next free number, ADR-011. Details
+  in the 2026-07-08 entries of [`../knowledge/log.md`](../knowledge/log.md). `main` was
+  previously rolled back to `051590f` (Phase 4 closeout) and the hermes-workflow-overlay
+  was adopted (`main` now guard-gated and branch-protected, PRs only).
 - **Phase 4 / Academic-research profile: complete.** The `academic-research`
   profile shipped end-to-end per addendum 003 on the ADR-007 profile system:
   the profile-data schema + citation vocabulary ADR-010 (#53), the data-backed

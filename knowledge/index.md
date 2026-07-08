@@ -5,17 +5,23 @@ Front door to the `llm-wiki-kit` knowledge layer. Conventions live in
 
 ## Current phase
 
-**2026-07-08 — Phase 5 / Enrichment + index maintenance: milestone #5 and issue #76 filed; ADR-011 drafting next.**
+**2026-07-08 — Phase 5 / Enrichment + index maintenance: ADR-011 drafted (`proposed`); Qwen3.7 Max adversarial review next.**
 Phase 4 is the last closed phase. Oliver ratified ADR-006/007/008/009/010 on
-2026-07-08; ratification debt is 0. Phase 5 milestone (**#5**) and the
-issue backlog I1 (**#76**, label `design`, title "Draft + accept ADR-011 —
-deterministic index maintenance") have been filed per `design/build-out-plan.md`
-§Phase 5. **ADR-011 is the gate-blocking prerequisite before Phase 5 implementation
-issues I2–I7 open.** The provisional build-out plan called this ADR-010, but that
-number is now the Phase 4 profile-data schema ADR; the index-maintenance ADR takes
-the next free number, ADR-011. `main` is guard-gated and branch-protected (PRs
-only). See the 2026-07-08 entries in [`log.md`](log.md) for the milestone/issue
-filing and governance state.
+2026-07-08; ratification debt is 0. Phase 5 milestone (**#5**) and issue backlog
+I1 (**#76**, label `design`) are filed; **[ADR-011](../design/adr/adr-011-deterministic-index-maintenance.md)
+(deterministic index maintenance) is now drafted as `proposed`** on branch
+`docs/adr-011-index-maintenance` (Option A: fenced generated regions in the
+OKF-reserved `index.md`, standalone ADR-006 staged write, `core-index-stale`
+warning). **No review has run and no acceptance is claimed.** The next action is
+the **adversarial review — Qwen3.7 Max via OpenRouter** (substituted for Codex;
+overlay-legal, recorded on issue #76 and in [`log.md`](log.md)) — **not**
+implementation; **ADR-011 remains the gate-blocking prerequisite before Phase 5
+implementation issues I2–I7 open**, unblocking only on Qwen `READY` + Oliver
+acceptance. The provisional build-out plan called this ADR-010, but that number
+is now the Phase 4 profile-data schema ADR; the index-maintenance ADR takes the
+next free number, ADR-011. `main` is guard-gated and branch-protected (PRs only).
+See the 2026-07-08 entries in [`log.md`](log.md) for the drafting, reviewer
+substitution, and governance state.
 
 **Phase 4 / Academic-research profile closed (issues #53–#59, PRs #61–#67 +
 closeout PR for #60; milestone #4 closes after that PR merges; ADR-010 accepted
@@ -84,21 +90,26 @@ questions **Q2/Q7/Q8 closed** with ADR + log back-references. See
 
 ## Next action
 
-**Phase 5 issue I1 (#76) filed; next action is to draft, Codex-review, and accept
-ADR-011 (deterministic index maintenance) before Phase 5 implementation issues I2–I7 open.**
+**ADR-011 drafted (`proposed`); next action is the Qwen3.7 Max adversarial review
+before acceptance and before Phase 5 implementation issues I2–I7 open.**
 Phase 4 is the last closed phase. Ratification debt is 0 (Oliver ratified
 ADR-006/007/008/009/010 on 2026-07-08). See the 2026-07-08 entries in
-[`log.md`](log.md) for the Phase 5 milestone #5 + issue #76 filing, the rollback
+[`log.md`](log.md) for the ADR-011 drafting, the Codex → Qwen3.7 Max reviewer
+substitution, the Phase 5 milestone #5 + issue #76 filing, the rollback
 background, overlay adoption, and ratification.
 
 Sequencing (overlay phase discipline):
 
-1. **Draft ADR-011** (deterministic index maintenance) per issue #76 scope.
-   All scope items must be covered or explicitly deferred with rationale.
-2. **Codex adversarial review** of ADR-011 draft. Must reach `READY` before
-   acceptance.
-3. **Accept ADR-011** (Oliver accept; if deferred to post-Phase-5-start, recorded
-   under ratification-debt cap per overlay).
+1. **Draft ADR-011** (deterministic index maintenance) per issue #76 scope —
+   **done** (`proposed`, branch `docs/adr-011-index-maintenance`; all 9 scope
+   items decided or deferred with rationale).
+2. **Adversarial review — Qwen3.7 Max via OpenRouter** (substituted for Codex;
+   Hermes coordinates) of the ADR-011 draft. **Next action.** Must reach `READY`
+   before acceptance; reviewer unavailable → halt and report to Oliver. Verbatim
+   artifact archived under `knowledge/reviews/`.
+3. **Accept ADR-011** (Qwen `READY` + Oliver's explicit acceptance; status flips
+   `proposed` → `accepted` in the same PR before merge, keeping ratification debt
+   at 0).
 4. **File Phase 5 implementation issues I2–I7** per
    [`design/build-out-plan.md`](../design/build-out-plan.md) §Phase 5 once
    ADR-011 is accepted.
