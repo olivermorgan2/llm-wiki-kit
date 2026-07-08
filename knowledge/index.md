@@ -6,13 +6,15 @@ Front door to the `llm-wiki-kit` knowledge layer. Conventions live in
 ## Current phase
 
 **2026-07-08 — main rolled back to `051590f` (the Phase 4 closeout);
-hermes-workflow-overlay adopted.** Three unreviewed direct-to-main commits
-(claiming Phases 5–7) were discarded after a post-hoc audit found them
-unbuildable, ADR-violating, and carrying fabricated closeout evidence — see
-the 2026-07-08 entry in [`log.md`](log.md). Phase 4 remains the last closed
-phase; **Phase 5 / Enrichment + index maintenance restarts from the
-build-out plan**, beginning with its index-maintenance ADR. `main` is now
-guard-gated and branch-protected (PRs only).
+hermes-workflow-overlay adopted; deferred PR #66/#67 Codex review debt cleared.**
+Three unreviewed direct-to-main commits (claiming Phases 5–7) were discarded
+after a post-hoc audit found them unbuildable, ADR-violating, and carrying
+fabricated closeout evidence — see the 2026-07-08 entries in [`log.md`](log.md).
+Phase 4 remains the last closed phase; **Phase 5 / Enrichment + index maintenance
+restarts from the build-out plan**, beginning with its index-maintenance ADR.
+`main` is now guard-gated and branch-protected (PRs only). The remaining
+governance blocker before filing Phase 5 issues is Oliver's ratification of
+ADR-006/007/008/009/010.
 
 **Phase 4 / Academic-research profile closed (issues #53–#59, PRs #61–#67 +
 closeout PR for #60; milestone #4 closes after that PR merges; ADR-010 accepted
@@ -64,7 +66,7 @@ questions **Q2/Q7/Q8 closed** with ADR + log back-references. See
 | [`risks.md`](risks.md) | Live risk register (product, cross-cutting, process, review). |
 | [`open-questions.md`](open-questions.md) | Q1–Q8 + bootstrap questions, with status. |
 | [`log.md`](log.md) | Chronological decision & review log. |
-| [`reviews/`](reviews/) | Verbatim review archives — [`2026-06-30-codex-prd-review.md`](reviews/2026-06-30-codex-prd-review.md), [`2026-07-01-codex-adr-001-005-review.md`](reviews/2026-07-01-codex-adr-001-005-review.md), [`2026-07-01-codex-adr-001-005-rereview.md`](reviews/2026-07-01-codex-adr-001-005-rereview.md). |
+| [`reviews/`](reviews/) | Verbatim review archives — [`2026-06-30-codex-prd-review.md`](reviews/2026-06-30-codex-prd-review.md), [`2026-07-01-codex-adr-001-005-review.md`](reviews/2026-07-01-codex-adr-001-005-review.md), [`2026-07-01-codex-adr-001-005-rereview.md`](reviews/2026-07-01-codex-adr-001-005-rereview.md), [`2026-07-08-codex-pr66-retro-review.md`](reviews/2026-07-08-codex-pr66-retro-review.md), [`2026-07-08-codex-pr67-retro-review.md`](reviews/2026-07-08-codex-pr67-retro-review.md). |
 | [`sources/`](sources/) | Verbatim sources — [`prd-original.md`](sources/prd-original.md). |
 
 ## Pointers into `design/` (authoritative, tool-maintained)

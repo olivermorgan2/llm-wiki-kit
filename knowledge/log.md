@@ -776,3 +776,16 @@ cap (≤1 phase), atomic closeouts, evidence honesty, explicit role/model
 assignments (Fable 5 plans w/ Opus 4.8 fallback; Opus 4.8 builds; Haiku
 curates this layer; Codex reviews; deterministic guard). The same overlay
 was applied to the workflow-kit source repo on 2026-07-08.
+
+### 2026-07-08 — Retroactive Codex reviews for PR #66/#67 — verdicts `PASS`
+
+After PR #71 adopted the hardened overlay, ran the deferred cross-vendor
+Codex reviews for the two Phase 4 PRs that had merged while the Codex CLI
+quota was exhausted. Both artifacts are archived verbatim:
+
+- [`reviews/2026-07-08-codex-pr66-retro-review.md`](reviews/2026-07-08-codex-pr66-retro-review.md) — PR #66 / issue #58 (`init --profile academic-research` + per-type templates): **PASS**, score **4/5**, no blockers, no non-blocking findings. Codex found the diff scoped and covered by CLI/scaffold tests plus observed five-platform checks.
+- [`reviews/2026-07-08-codex-pr67-retro-review.md`](reviews/2026-07-08-codex-pr67-retro-review.md) — PR #67 / issue #59 (Phase 4 acceptance corpus): **PASS**, score **4/5**, no blockers. Codex noted one non-blocking precision gap: the acceptance negative-control test checks expected finding presence rather than exact-one findings; the separate addendum-003 fixture gate covers exactness.
+
+**Gate status:** the inherited PR #66/#67 review debt is cleared. No product
+code changed in this debt-clearance PR; the remaining governance blocker
+before filing Phase 5 issues is Oliver's ratification of ADR-006/007/008/009/010.
